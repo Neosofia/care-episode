@@ -59,14 +59,14 @@ def app_container():
         container = DockerContainer(IMAGE_TAG)
         container.with_kwargs(extra_hosts={"host.docker.internal": "host-gateway"})
         container.with_env("ENV", "test")
-        container.with_env("PORT", "7018")
+        container.with_env("PORT", "8015")
         container.with_env("JWT_JWKS_URI", "http://identity:8014/.well-known/jwks.json")
         container.with_env("APP_DATABASE_URL", app_url_container)
         container.with_env("MIGRATION_DATABASE_URL", migration_url_container)
-        container.with_exposed_ports(7018)
+        container.with_exposed_ports(8015)
 
         with container as c:
-            port = c.get_exposed_port(7018)
+            port = c.get_exposed_port(8015)
             host = c.get_container_host_ip()
             base_url = f"http://{host}:{port}"
             start = time.time()
