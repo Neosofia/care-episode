@@ -20,7 +20,7 @@ class CareEpisodeSession(Base, AuditColumnsMixin):
     surgery: Mapped[str] = mapped_column(String(255), nullable=False)
     procedure_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    featured: Mapped[bool] = mapped_column(nullable=False, default=False)
+    risk_level: Mapped[str] = mapped_column(String(16), nullable=False, default="low")
     tenant_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
 
 

@@ -11,9 +11,20 @@ def test_openapi_spec_contains_core_paths():
     spec = json.loads((root / "openapi.json").read_text())
 
     assert spec["openapi"] == "3.0.3"
+    assert spec["info"]["title"] == "Care Episode Service API"
     assert "/health" in spec["paths"]
-    assert "/api/v1/documents/{document_id}" in spec["paths"]
-    assert "/api/v1/documents/{document_id}/summary" in spec["paths"]
+    assert "/api/v1/care-episodes/sessions" in spec["paths"]
+    assert "/api/v1/care-episodes/{patient_uuid}/clone-demo" in spec["paths"]
+
+
+def test_openapi_spec_defines_session_risk_level():
+    root = Path(__file__).resolve().parents[3]
+    spec = json.loads((root / "openapi.json").read_text())
+
+    session = spec["components"]["schemas"]["CareEpisodeSession"]
+    assert "risk_level" in session["required"]
+    assert session["properties"]["risk_level"]["enum"] == ["high", "medium", "low"]
+    assert "featured" not in session["properties"]
 
 
 def test_openapi_spec_defines_error_schema():

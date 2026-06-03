@@ -30,7 +30,7 @@ def list_sessions(db, tenant_uuid: str | None = None) -> list[dict]:
             "procedure_date": session.procedure_date.isoformat(),
             "days_post_op": int(days),
             "session_id": session.session_id,
-            "featured": bool(session.featured),
+            "risk_level": session.risk_level,
         }
         for session, days in rows
     ]
@@ -92,7 +92,8 @@ def upsert_session(db, payload: dict, *, changed_by_uuid: str, changed_by_type: 
     row.surgery = str(payload["surgery"])
     row.procedure_date = datetime.date.fromisoformat(str(payload["procedure_date"]))
     row.session_id = str(payload["session_id"])
-    row.featured = bool(payload.get("featured", False))
+    level = str(payload.get("risk_level", "low")).strip().lower()
+    row.risk_level = level if level in {"high", "medium", "low"} else "low"
     row.tenant_uuid = uuid.UUID(str(payload["tenant_uuid"]))
     row.changed_by_uuid = uuid.UUID(str(changed_by_uuid))
     row.changed_by_type = changed_by_type
@@ -106,7 +107,7 @@ def upsert_session(db, payload: dict, *, changed_by_uuid: str, changed_by_type: 
         "procedure_date": row.procedure_date.isoformat(),
         "days_post_op": (datetime.date.today() - row.procedure_date).days,
         "session_id": row.session_id,
-        "featured": bool(row.featured),
+        "risk_level": row.risk_level,
     }
 
 

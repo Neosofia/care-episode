@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from werkzeug.exceptions import BadRequest, NotFound
@@ -17,6 +17,46 @@ from src.services.care_episode_service import upsert_session
 
 UTC = timezone.utc
 _TEMPLATE_FILE = Path(__file__).resolve().parents[1] / "data" / "demo_patient_template.json"
+
+# Align with cdp/scripts/demo_seed_payload.py dashboard_appointments (Alice / PAT-2847).
+_UPCOMING_APPOINTMENT_OFFSETS: tuple[tuple[int, int, int], ...] = (
+    (2, 10, 30),
+    (8, 14, 0),
+    (23, 9, 0),
+)
+_INBOX_SENT_AGO: tuple[timedelta, ...] = (
+    timedelta(hours=1),
+    timedelta(hours=3),
+    timedelta(days=1, hours=2),
+)
+
+
+def scheduled_at_for_demo_appointment(now: datetime, index: int) -> datetime:
+    """Return a future appointment time for demo dashboards (now + a few days)."""
+    if index < len(_UPCOMING_APPOINTMENT_OFFSETS):
+        days, hours, minutes = _UPCOMING_APPOINTMENT_OFFSETS[index]
+        return now + timedelta(days=days, hours=hours, minutes=minutes)
+    last_days, last_hours, last_minutes = _UPCOMING_APPOINTMENT_OFFSETS[-1]
+    extra_weeks = index - len(_UPCOMING_APPOINTMENT_OFFSETS) + 1
+    return now + timedelta(
+        days=last_days + extra_weeks * 7,
+        hours=last_hours,
+        minutes=last_minutes,
+    )
+
+
+def sent_at_for_demo_inbox_message(now: datetime, index: int) -> datetime:
+    if index < len(_INBOX_SENT_AGO):
+        return now - _INBOX_SENT_AGO[index]
+    return now - timedelta(hours=6 * (index + 1))
+
+
+def read_at_for_demo_inbox_message(now: datetime, index: int, template_had_read: bool) -> datetime | None:
+    if not template_had_read:
+        return None
+    if index == 2:
+        return now - timedelta(hours=20)
+    return now - timedelta(hours=2)
 
 
 def _load_template_meta() -> dict:
@@ -47,18 +87,38 @@ def patient_has_demo_dashboard(db, patient_id: uuid.UUID) -> bool:
     )
 
 
-def _latest_template_timestamp(
-    appointments: list[CareEpisodeAppointment],
-    messages: list[CareEpisodeInboxMessage],
-) -> datetime:
-    candidates: list[datetime] = []
-    for row in appointments:
-        candidates.append(row.scheduled_at.astimezone(UTC))
-    for row in messages:
-        candidates.append(row.sent_at.astimezone(UTC))
-    if not candidates:
-        return datetime.now(UTC)
-    return max(candidates)
+def _refresh_demo_dashboard_times(
+    db,
+    target_id: uuid.UUID,
+    *,
+    changed_by_uuid: uuid.UUID,
+    changed_by_type: int,
+) -> tuple[int, int]:
+    now = datetime.now(UTC)
+    appointments = (
+        db.query(CareEpisodeAppointment)
+        .filter(CareEpisodeAppointment.patient_uuid == target_id)
+        .order_by(CareEpisodeAppointment.scheduled_at.asc())
+        .all()
+    )
+    for idx, row in enumerate(appointments):
+        row.scheduled_at = scheduled_at_for_demo_appointment(now, idx)
+        row.changed_by_uuid = changed_by_uuid
+        row.changed_by_type = changed_by_type
+
+    messages = (
+        db.query(CareEpisodeInboxMessage)
+        .filter(CareEpisodeInboxMessage.patient_uuid == target_id)
+        .order_by(CareEpisodeInboxMessage.sent_at.asc())
+        .all()
+    )
+    for idx, row in enumerate(messages):
+        row.sent_at = sent_at_for_demo_inbox_message(now, idx)
+        row.read_at = read_at_for_demo_inbox_message(now, idx, row.read_at is not None)
+        row.changed_by_uuid = changed_by_uuid
+        row.changed_by_type = changed_by_type
+
+    return len(appointments), len(messages)
 
 
 def clone_patient_demo_from_template(
@@ -77,11 +137,22 @@ def clone_patient_demo_from_template(
     if target_id == source_id:
         raise BadRequest("cannot clone demo data onto the template patient")
 
+    actor_id = uuid.UUID(str(changed_by_uuid))
+
     if patient_has_demo_dashboard(db, target_id):
+        appt_count, msg_count = _refresh_demo_dashboard_times(
+            db,
+            target_id,
+            changed_by_uuid=actor_id,
+            changed_by_type=changed_by_type,
+        )
+        db.commit()
         return {
             "patient_uuid": str(target_id),
             "cloned": False,
             "reason": "already_present",
+            "appointments_refreshed": appt_count,
+            "messages_refreshed": msg_count,
         }
 
     template_session = db.get(CareEpisodeSession, source_id)
@@ -98,9 +169,7 @@ def clone_patient_demo_from_template(
         db.query(CareEpisodeInboxMessage).filter(CareEpisodeInboxMessage.patient_uuid == source_id).all()
     )
 
-    actor_id = uuid.UUID(str(changed_by_uuid))
     now = datetime.now(UTC)
-    time_anchor = _latest_template_timestamp(template_appointments, template_messages)
 
     upsert_session(
         db,
@@ -112,7 +181,7 @@ def clone_patient_demo_from_template(
             "surgery": template_session.surgery,
             "procedure_date": template_session.procedure_date.isoformat(),
             "session_id": template_session.session_id,
-            "featured": False,
+            "risk_level": "low",
         },
         changed_by_uuid=changed_by_uuid,
         changed_by_type=changed_by_type,
@@ -133,9 +202,9 @@ def clone_patient_demo_from_template(
             )
         )
 
-    for row in template_appointments:
-        scheduled = row.scheduled_at.astimezone(UTC)
-        shifted = now + (scheduled - time_anchor)
+    sorted_appointments = sorted(template_appointments, key=lambda r: r.scheduled_at)
+    for idx, row in enumerate(sorted_appointments):
+        shifted = scheduled_at_for_demo_appointment(now, idx)
         db.add(
             CareEpisodeAppointment(
                 patient_uuid=target_id,
@@ -149,13 +218,10 @@ def clone_patient_demo_from_template(
             )
         )
 
-    for row in template_messages:
-        sent = row.sent_at.astimezone(UTC)
-        shifted_sent = now + (sent - time_anchor)
-        read_at = None
-        if row.read_at is not None:
-            read_src = row.read_at.astimezone(UTC)
-            read_at = now + (read_src - time_anchor)
+    sorted_messages = sorted(template_messages, key=lambda r: r.sent_at)
+    for idx, row in enumerate(sorted_messages):
+        shifted_sent = sent_at_for_demo_inbox_message(now, idx)
+        read_at = read_at_for_demo_inbox_message(now, idx, row.read_at is not None)
         db.add(
             CareEpisodeInboxMessage(
                 patient_uuid=target_id,

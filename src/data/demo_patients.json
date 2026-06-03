@@ -13,7 +13,7 @@
         "procedureDate": "2026-05-29",
         "sessionId": "S-7291",
         "messageCount": 38,
-        "featured": true
+        "risk_level": "high"
       }
     },
     {
@@ -25,9 +25,10 @@
       "idp_id": "demo_patient_pat_2912",
       "clinical": {
         "surgery": "Inguinal hernia repair",
-        "procedureDate": "2026-05-31",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7288",
-        "messageCount": 14
+        "messageCount": 14,
+        "risk_level": "low"
       }
     },
     {
@@ -39,9 +40,10 @@
       "idp_id": "demo_patient_pat_2763",
       "clinical": {
         "surgery": "Partial knee meniscectomy",
-        "procedureDate": "2026-05-27",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7285",
-        "messageCount": 22
+        "messageCount": 22,
+        "risk_level": "low"
       }
     },
     {
@@ -53,9 +55,10 @@
       "idp_id": "demo_patient_pat_3001",
       "clinical": {
         "surgery": "Appendectomy",
-        "procedureDate": "2026-06-01",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7294",
-        "messageCount": 9
+        "messageCount": 9,
+        "risk_level": "low"
       }
     },
     {
@@ -67,9 +70,10 @@
       "idp_id": "demo_patient_pat_3055",
       "clinical": {
         "surgery": "Total thyroidectomy",
-        "procedureDate": "2026-05-30",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7301",
-        "messageCount": 11
+        "messageCount": 11,
+        "risk_level": "low"
       }
     },
     {
@@ -81,9 +85,10 @@
       "idp_id": "demo_patient_pat_3088",
       "clinical": {
         "surgery": "Cataract extraction",
-        "procedureDate": "2026-06-01",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7298",
-        "messageCount": 6
+        "messageCount": 6,
+        "risk_level": "low"
       }
     },
     {
@@ -95,9 +100,10 @@
       "idp_id": "demo_patient_pat_3102",
       "clinical": {
         "surgery": "Cesarean section",
-        "procedureDate": "2026-05-28",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7295",
-        "messageCount": 16
+        "messageCount": 16,
+        "risk_level": "medium"
       }
     },
     {
@@ -109,9 +115,10 @@
       "idp_id": "demo_patient_pat_3120",
       "clinical": {
         "surgery": "Rotator cuff repair",
-        "procedureDate": "2026-05-26",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7292",
-        "messageCount": 19
+        "messageCount": 19,
+        "risk_level": "low"
       }
     },
     {
@@ -123,9 +130,10 @@
       "idp_id": "demo_patient_pat_3144",
       "clinical": {
         "surgery": "Diagnostic hysteroscopy",
-        "procedureDate": "2026-05-31",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7289",
-        "messageCount": 8
+        "messageCount": 8,
+        "risk_level": "medium"
       }
     },
     {
@@ -137,9 +145,10 @@
       "idp_id": "demo_patient_pat_3166",
       "clinical": {
         "surgery": "Colonoscopy with polypectomy",
-        "procedureDate": "2026-06-01",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7286",
-        "messageCount": 5
+        "messageCount": 5,
+        "risk_level": "medium"
       }
     },
     {
@@ -151,9 +160,10 @@
       "idp_id": "demo_patient_pat_3188",
       "clinical": {
         "surgery": "Laparoscopic Nissen fundoplication",
-        "procedureDate": "2026-05-29",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7283",
-        "messageCount": 13
+        "messageCount": 13,
+        "risk_level": "medium"
       }
     },
     {
@@ -165,9 +175,10 @@
       "idp_id": "demo_patient_pat_3210",
       "clinical": {
         "surgery": "Total hip arthroplasty",
-        "procedureDate": "2026-05-25",
+        "procedureDate": "2026-05-15",
         "sessionId": "S-7280",
-        "messageCount": 24
+        "messageCount": 24,
+        "risk_level": "low"
       }
     }
   ]

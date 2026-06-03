@@ -148,7 +148,16 @@ def post_invite() -> Response:
 @with_security(**_WRITE)
 def post_session() -> Response:
     payload = request.get_json(silent=True) or {}
-    required = ("patient_uuid", "tenant_uuid", "display_code", "display_name", "surgery", "procedure_date", "session_id")
+    required = (
+        "patient_uuid",
+        "tenant_uuid",
+        "display_code",
+        "display_name",
+        "surgery",
+        "procedure_date",
+        "session_id",
+        "risk_level",
+    )
     missing = [field for field in required if payload.get(field) in (None, "")]
     if missing:
         raise BadRequest(f"missing required fields: {missing}")
