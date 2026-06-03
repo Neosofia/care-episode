@@ -1,0 +1,5 @@
+{
+  "template_patient_uuid": "00000000-0000-7000-8000-000000002847",
+  "marker_record_title": "Imaging - AP Abdomen (Urgent Care)",
+  "note": "Catalog patient PAT-2847 (Alice Hartley). Seed script must populate this UUID; operators clone dashboard/profile data from it."
+}
