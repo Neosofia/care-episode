@@ -30,7 +30,7 @@ def list_sessions(db, tenant_uuid: str | None = None) -> list[dict]:
             "procedure_date": session.procedure_date.isoformat(),
             "days_post_op": int(days),
             "session_id": session.session_id,
-            "risk_level": session.risk_level,
+            "risk_level": session.risk_level or "low",
         }
         for session, days in rows
     ]
