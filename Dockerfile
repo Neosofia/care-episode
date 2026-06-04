@@ -61,6 +61,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH="/app"
 
+COPY pyproject.toml ./pyproject.toml
 COPY alembic.ini ./alembic.ini
 COPY src ./src
 COPY policies ./policies

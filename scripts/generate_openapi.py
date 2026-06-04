@@ -331,8 +331,14 @@ def build_spec() -> dict:
         "schemas": {
             "HealthResponse": {
                 "type": "object",
-                "required": ["status"],
-                "properties": {"status": {"type": "string", "enum": ["ok"]}},
+                "required": ["status", "version"],
+                "properties": {
+                    "status": {"type": "string", "enum": ["ok"]},
+                    "version": {
+                        "type": "string",
+                        "description": "Service semver from pyproject at install/build time.",
+                    },
+                },
             },
             "ErrorResponse": ERROR_RESPONSE,
             "CareEpisodeSession": {

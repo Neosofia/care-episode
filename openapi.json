@@ -964,7 +964,8 @@
       "HealthResponse": {
         "type": "object",
         "required": [
-          "status"
+          "status",
+          "version"
         ],
         "properties": {
           "status": {
@@ -972,6 +973,10 @@
             "enum": [
               "ok"
             ]
+          },
+          "version": {
+            "type": "string",
+            "description": "Service semver from pyproject at install/build time."
           }
         }
       },
