@@ -73,7 +73,7 @@ def demo_marker_record_title() -> str:
     return str(meta["marker_record_title"])
 
 
-def patient_has_demo_dashboard(db, patient_id: uuid.UUID) -> bool:
+def patient_has_demo_marker_record(db, patient_id: uuid.UUID) -> bool:
     marker = demo_marker_record_title()
     return (
         db.query(CareEpisodeRecord.record_uuid)
@@ -85,6 +85,29 @@ def patient_has_demo_dashboard(db, patient_id: uuid.UUID) -> bool:
         .first()
         is not None
     )
+
+
+def patient_has_demo_dashboard(db, patient_id: uuid.UUID) -> bool:
+    """True when the patient has the full demo dashboard (not only records from a failed clone)."""
+    if not patient_has_demo_marker_record(db, patient_id):
+        return False
+    if db.get(CareEpisodeSession, patient_id) is None:
+        return False
+    has_appointment = (
+        db.query(CareEpisodeAppointment.appointment_uuid)
+        .filter(CareEpisodeAppointment.patient_uuid == patient_id)
+        .limit(1)
+        .first()
+        is not None
+    )
+    has_message = (
+        db.query(CareEpisodeInboxMessage.message_uuid)
+        .filter(CareEpisodeInboxMessage.patient_uuid == patient_id)
+        .limit(1)
+        .first()
+        is not None
+    )
+    return has_appointment and has_message
 
 
 def _refresh_demo_dashboard_times(
@@ -155,6 +178,8 @@ def clone_patient_demo_from_template(
             "messages_refreshed": msg_count,
         }
 
+    repair_incomplete = patient_has_demo_marker_record(db, target_id)
+
     template_session = db.get(CareEpisodeSession, source_id)
     if template_session is None:
         raise NotFound("demo template patient is not seeded")
@@ -171,75 +196,101 @@ def clone_patient_demo_from_template(
 
     now = datetime.now(UTC)
 
-    upsert_session(
-        db,
-        {
-            "patient_uuid": str(target_id),
-            "tenant_uuid": tenant_uuid,
-            "display_code": display_code,
-            "display_name": display_name,
-            "surgery": template_session.surgery,
-            "procedure_date": template_session.procedure_date.isoformat(),
-            "session_id": template_session.session_id,
-            "risk_level": "low",
-        },
-        changed_by_uuid=changed_by_uuid,
-        changed_by_type=changed_by_type,
+    if db.get(CareEpisodeSession, target_id) is None:
+        upsert_session(
+            db,
+            {
+                "patient_uuid": str(target_id),
+                "tenant_uuid": tenant_uuid,
+                "display_code": display_code,
+                "display_name": display_name,
+                "surgery": template_session.surgery,
+                "procedure_date": template_session.procedure_date.isoformat(),
+                "session_id": template_session.session_id,
+                "last_activity": template_session.last_activity,
+                "risk_level": "low",
+            },
+            changed_by_uuid=changed_by_uuid,
+            changed_by_type=changed_by_type,
+        )
+
+    records_added = 0
+    if not repair_incomplete:
+        for row in template_records:
+            db.add(
+                CareEpisodeRecord(
+                    patient_uuid=target_id,
+                    title=row.title,
+                    date=row.date,
+                    type=row.type,
+                    provider=row.provider,
+                    summary=row.summary,
+                    image_key=row.image_key,
+                    changed_by_uuid=actor_id,
+                    changed_by_type=changed_by_type,
+                )
+            )
+        records_added = len(template_records)
+
+    existing_appointments = (
+        db.query(CareEpisodeAppointment.appointment_uuid)
+        .filter(CareEpisodeAppointment.patient_uuid == target_id)
+        .limit(1)
+        .first()
+        is not None
     )
-
-    for row in template_records:
-        db.add(
-            CareEpisodeRecord(
-                patient_uuid=target_id,
-                title=row.title,
-                date=row.date,
-                type=row.type,
-                provider=row.provider,
-                summary=row.summary,
-                image_key=row.image_key,
-                changed_by_uuid=actor_id,
-                changed_by_type=changed_by_type,
-            )
-        )
-
+    appointments_added = 0
     sorted_appointments = sorted(template_appointments, key=lambda r: r.scheduled_at)
-    for idx, row in enumerate(sorted_appointments):
-        shifted = scheduled_at_for_demo_appointment(now, idx)
-        db.add(
-            CareEpisodeAppointment(
-                patient_uuid=target_id,
-                clinician_user_uuid=row.clinician_user_uuid,
-                clinician_display_name=row.clinician_display_name,
-                specialty=row.specialty,
-                scheduled_at=shifted,
-                status=row.status,
-                changed_by_uuid=actor_id,
-                changed_by_type=changed_by_type,
+    if not existing_appointments:
+        for idx, row in enumerate(sorted_appointments):
+            shifted = scheduled_at_for_demo_appointment(now, idx)
+            db.add(
+                CareEpisodeAppointment(
+                    patient_uuid=target_id,
+                    clinician_user_uuid=row.clinician_user_uuid,
+                    clinician_display_name=row.clinician_display_name,
+                    specialty=row.specialty,
+                    scheduled_at=shifted,
+                    status=row.status,
+                    changed_by_uuid=actor_id,
+                    changed_by_type=changed_by_type,
+                )
             )
-        )
+        appointments_added = len(template_appointments)
 
+    existing_messages = (
+        db.query(CareEpisodeInboxMessage.message_uuid)
+        .filter(CareEpisodeInboxMessage.patient_uuid == target_id)
+        .limit(1)
+        .first()
+        is not None
+    )
+    messages_added = 0
     sorted_messages = sorted(template_messages, key=lambda r: r.sent_at)
-    for idx, row in enumerate(sorted_messages):
-        shifted_sent = sent_at_for_demo_inbox_message(now, idx)
-        read_at = read_at_for_demo_inbox_message(now, idx, row.read_at is not None)
-        db.add(
-            CareEpisodeInboxMessage(
-                patient_uuid=target_id,
-                sender_user_uuid=row.sender_user_uuid,
-                sender_display_name=row.sender_display_name,
-                body=row.body,
-                sent_at=shifted_sent,
-                read_at=read_at,
-                changed_by_uuid=actor_id,
-                changed_by_type=changed_by_type,
+    if not existing_messages:
+        for idx, row in enumerate(sorted_messages):
+            shifted_sent = sent_at_for_demo_inbox_message(now, idx)
+            read_at = read_at_for_demo_inbox_message(now, idx, row.read_at is not None)
+            db.add(
+                CareEpisodeInboxMessage(
+                    patient_uuid=target_id,
+                    sender_user_uuid=row.sender_user_uuid,
+                    sender_display_name=row.sender_display_name,
+                    body=row.body,
+                    sent_at=shifted_sent,
+                    read_at=read_at,
+                    changed_by_uuid=actor_id,
+                    changed_by_type=changed_by_type,
+                )
             )
-        )
+        messages_added = len(template_messages)
 
     db.commit()
     return {
         "patient_uuid": str(target_id),
         "cloned": True,
-        "records": len(template_records),
-        "appointments": len(template_appointments),
-        "messages": len(template_messages),
+        "repaired_incomplete": repair_incomplete,
+        "records": records_added,
+        "appointments": appointments_added,
+        "messages": messages_added,
     }

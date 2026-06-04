@@ -15,6 +15,11 @@ from src.models.care_episode import (
 UTC = datetime.timezone.utc
 
 
+def _default_last_activity(now: datetime.datetime | None = None) -> str:
+    instant = now or datetime.datetime.now(UTC)
+    return instant.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def list_sessions(db, tenant_uuid: str | None = None) -> list[dict]:
     days_post_op = (func.current_date() - CareEpisodeSession.procedure_date).label("days_post_op")
     query = db.query(CareEpisodeSession, days_post_op)
@@ -92,6 +97,12 @@ def upsert_session(db, payload: dict, *, changed_by_uuid: str, changed_by_type: 
     row.surgery = str(payload["surgery"])
     row.procedure_date = datetime.date.fromisoformat(str(payload["procedure_date"]))
     row.session_id = str(payload["session_id"])
+    last_activity = payload.get("last_activity")
+    row.last_activity = (
+        str(last_activity).strip()
+        if last_activity is not None and str(last_activity).strip()
+        else _default_last_activity()
+    )
     level = str(payload.get("risk_level", "low")).strip().lower()
     row.risk_level = level if level in {"high", "medium", "low"} else "low"
     row.tenant_uuid = uuid.UUID(str(payload["tenant_uuid"]))

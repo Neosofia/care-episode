@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 
 from authorization_in_the_middle.security import with_security
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, g, jsonify, request
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
 from src.authorization.entities import care_episode_catalog_entities, care_episode_catalog_resource_uid
@@ -170,12 +170,26 @@ def post_session() -> Response:
     return jsonify(item), 201
 
 
+_CLONE_DEMO_ACTORS = frozenset({"operator", "clinician", "patient"})
+
+
+def _authorize_clone_demo(active_actor: str, patient_uuid: str) -> None:
+    if active_actor not in _CLONE_DEMO_ACTORS:
+        raise Forbidden(
+            "operator, clinician, or patient actor required to clone demo patient data"
+        )
+    if active_actor == "patient":
+        claims = getattr(g, "jwt_claims", None) or {}
+        principal_uuid = str(claims.get("sub") or "").strip()
+        if principal_uuid != str(patient_uuid).strip():
+            raise Forbidden("patient may only clone demo data for self")
+
+
 @bp.post("/<patient_uuid>/clone-demo")
 @with_security(**_WRITE)
 def post_clone_demo(patient_uuid: str) -> Response:
     active_actor = (request.headers.get("X-Active-Actor") or "").strip().lower()
-    if active_actor != "operator":
-        raise Forbidden("operator actor required to clone demo patient data")
+    _authorize_clone_demo(active_actor, patient_uuid)
 
     payload = request.get_json(silent=True) or {}
     required = ("tenant_uuid", "display_name", "display_code")
