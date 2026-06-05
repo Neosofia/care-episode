@@ -154,7 +154,7 @@ def clone_patient_demo_from_template(
     changed_by_uuid: str,
     changed_by_type: int = 2,
 ) -> dict:
-    """Copy session, records, appointments, and inbox from the hidden template patient (no transcript)."""
+    """Copy session, records, appointments, and inbox from the hidden template patient."""
     target_id = uuid.UUID(str(target_patient_uuid))
     source_id = template_patient_uuid()
     if target_id == source_id:

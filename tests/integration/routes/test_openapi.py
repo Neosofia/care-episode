@@ -15,6 +15,7 @@ def test_openapi_spec_contains_core_paths():
     assert "/health" in spec["paths"]
     assert "/api/v1/care-episodes/sessions" in spec["paths"]
     assert "/api/v1/care-episodes/{patient_uuid}/clone-demo" in spec["paths"]
+    assert "/api/v1/care-episodes/{patient_uuid}/transcript" not in spec["paths"]
 
 
 def test_openapi_spec_defines_session_risk_level():

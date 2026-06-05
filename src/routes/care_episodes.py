@@ -17,11 +17,9 @@ from src.services.care_episode_service import (
     mark_inbox_message_read,
     patient_inbox_messages,
     patient_records,
-    patient_transcript,
     replace_appointments,
     replace_inbox_messages,
     replace_records,
-    replace_transcript,
     upsert_session,
 )
 from src.services.demo_clone_service import clone_patient_demo_from_template
@@ -59,13 +57,6 @@ def get_sessions() -> Response:
 def get_records(patient_uuid: str) -> Response:
     with SessionLocal() as db:
         return jsonify({"items": patient_records(db, patient_uuid)})
-
-
-@bp.get("/<patient_uuid>/transcript")
-@with_security(**_READ)
-def get_transcript(patient_uuid: str) -> Response:
-    with SessionLocal() as db:
-        return jsonify({"items": patient_transcript(db, patient_uuid)})
 
 
 @bp.get("/<patient_uuid>/appointments")
@@ -227,18 +218,3 @@ def post_records(patient_uuid: str) -> Response:
     return jsonify(item), 201
 
 
-@bp.post("/<patient_uuid>/transcript")
-@with_security(**_WRITE)
-def post_transcript(patient_uuid: str) -> Response:
-    payload = request.get_json(silent=True) or {}
-    messages = payload.get("items")
-    if not isinstance(messages, list):
-        raise BadRequest("items must be a list")
-    with SessionLocal() as db:
-        item = replace_transcript(
-            db,
-            patient_uuid,
-            messages,
-            changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"),
-        )
-    return jsonify(item), 201

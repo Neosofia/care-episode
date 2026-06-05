@@ -42,20 +42,6 @@ class CareEpisodeRecord(Base, AuditColumnsMixin):
     image_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
-class CareEpisodeTranscript(Base, AuditColumnsMixin):
-    __tablename__ = "care_episode_transcripts"
-
-    message_uuid: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=text("uuidv7()"),
-    )
-    patient_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
-    role: Mapped[str] = mapped_column(String(32), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    time_label: Mapped[str] = mapped_column(String(32), nullable=False)
-
-
 class CareEpisodeAppointment(Base, AuditColumnsMixin):
     __tablename__ = "care_episode_appointments"
 

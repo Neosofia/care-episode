@@ -9,7 +9,6 @@ from src.models.care_episode import (
     CareEpisodeInboxMessage,
     CareEpisodeRecord,
     CareEpisodeSession,
-    CareEpisodeTranscript,
 )
 
 UTC = datetime.timezone.utc
@@ -60,16 +59,6 @@ def patient_records(db, patient_uuid: str) -> list[dict]:
         }
         for row in rows
     ]
-
-
-def patient_transcript(db, patient_uuid: str) -> list[dict]:
-    rows = (
-        db.query(CareEpisodeTranscript)
-        .filter(CareEpisodeTranscript.patient_uuid == uuid.UUID(str(patient_uuid)))
-        .order_by(CareEpisodeTranscript.time_label.asc())
-        .all()
-    )
-    return [{"id": str(row.message_uuid), "role": row.role, "content": row.content, "time": row.time_label} for row in rows]
 
 
 def create_episode_invite(payload: dict) -> dict:
@@ -358,38 +347,3 @@ def replace_inbox_messages(
     return {"patient_uuid": str(patient_id), "count": inserted}
 
 
-def replace_transcript(db, patient_uuid: str, messages: list[dict], *, changed_by_uuid: str, changed_by_type: int = 2) -> dict:
-    patient_id = uuid.UUID(str(patient_uuid))
-    existing_rows = (
-        db.query(CareEpisodeTranscript)
-        .filter(CareEpisodeTranscript.patient_uuid == patient_id)
-        .all()
-    )
-    existing = {
-        (row.role, row.content, row.time_label)
-        for row in existing_rows
-    }
-
-    inserted = 0
-    for message in messages:
-        candidate = (
-            str(message["role"]),
-            str(message["content"]),
-            str(message["time"]),
-        )
-        if candidate in existing:
-            continue
-        db.add(
-            CareEpisodeTranscript(
-                patient_uuid=patient_id,
-                role=candidate[0],
-                content=candidate[1],
-                time_label=candidate[2],
-                changed_by_uuid=uuid.UUID(str(changed_by_uuid)),
-                changed_by_type=changed_by_type,
-            )
-        )
-        existing.add(candidate)
-        inserted += 1
-    db.commit()
-    return {"patient_uuid": str(patient_id), "count": inserted}

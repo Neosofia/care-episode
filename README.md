@@ -30,11 +30,7 @@ When you copy this template into a standalone repository, replace that local sou
 - `GET /api/v1/documents/{document_id}/summary`
 - `DELETE /api/v1/documents/{document_id}`
 
-The machine-readable contract lives in `openapi.json`. Regenerate after route or schema changes:
-
-```bash
-uv run python scripts/generate_openapi.py
-```
+The machine-readable contract lives in `openapi.json` at the repo root (edit directly when routes or schemas change).
 
 ## Database
 

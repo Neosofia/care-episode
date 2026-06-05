@@ -3,7 +3,7 @@
   "info": {
     "title": "Care Episode Service API",
     "version": "0.2.0",
-    "description": "Care episodes, demo sessions, records, transcripts, appointments, and inbox messages."
+    "description": "Care episodes, demo sessions, records, appointments, and inbox messages."
   },
   "paths": {
     "/health": {
@@ -288,156 +288,6 @@
                     "type": "array",
                     "items": {
                       "$ref": "#/components/schemas/RecordUpsertItem"
-                    }
-                  },
-                  "changed_by_uuid": {
-                    "type": "string",
-                    "format": "uuid"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Rows inserted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReplaceCountResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/care-episodes/{patient_uuid}/transcript": {
-      "get": {
-        "operationId": "listCareEpisodeTranscript",
-        "parameters": [
-          {
-            "name": "patient_uuid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Items",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "items"
-                  ],
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/TranscriptMessage"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "operationId": "replaceCareEpisodeTranscript",
-        "parameters": [
-          {
-            "name": "patient_uuid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "items"
-                ],
-                "properties": {
-                  "items": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/TranscriptUpsertItem"
                     }
                   },
                   "changed_by_uuid": {
@@ -1267,48 +1117,6 @@
             "type": "string"
           },
           "imageKey": {
-            "type": "string"
-          }
-        }
-      },
-      "TranscriptMessage": {
-        "type": "object",
-        "required": [
-          "id",
-          "role",
-          "content",
-          "time"
-        ],
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string"
-          },
-          "content": {
-            "type": "string"
-          },
-          "time": {
-            "type": "string"
-          }
-        }
-      },
-      "TranscriptUpsertItem": {
-        "type": "object",
-        "required": [
-          "role",
-          "content",
-          "time"
-        ],
-        "properties": {
-          "role": {
-            "type": "string"
-          },
-          "content": {
-            "type": "string"
-          },
-          "time": {
             "type": "string"
           }
         }
