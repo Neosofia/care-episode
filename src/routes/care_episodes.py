@@ -6,8 +6,6 @@ from authorization_in_the_middle.security import with_security
 from flask import Blueprint, Response, g, jsonify, request
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
-from src.authorization.entities import care_episode_catalog_entities, care_episode_catalog_resource_uid
-from src.bootstrap.capabilities import Capabilities
 from src.bootstrap.config import settings
 from src.db.engine import SessionLocal
 from src.services.care_episode_service import (
@@ -26,18 +24,6 @@ from src.services.demo_clone_service import clone_patient_demo_from_template
 
 bp = Blueprint("care-episodes", __name__, url_prefix="/api/v1/care-episodes")
 
-_READ = dict(
-    action=Capabilities.CARE_EPISODE_READ,
-    resource_fn=care_episode_catalog_resource_uid,
-    entities_fn=care_episode_catalog_entities,
-    rate_limit=settings.care_episode_read_rate_limit,
-)
-_WRITE = dict(
-    action=Capabilities.CARE_EPISODE_CREATE,
-    resource_type="CareEpisodeCatalog",
-    rate_limit=settings.care_episode_write_rate_limit,
-)
-
 
 def init_care_episode_routes(app, cedar_evaluator):
     app.extensions["cedar_evaluator"] = cedar_evaluator
@@ -45,7 +31,7 @@ def init_care_episode_routes(app, cedar_evaluator):
 
 
 @bp.get("/sessions")
-@with_security(**_READ)
+@with_security(rate_limit=settings.care_episode_read_rate_limit)
 def get_sessions() -> Response:
     tenant_uuid = request.args.get("tenant_uuid")
     with SessionLocal() as db:
@@ -53,28 +39,28 @@ def get_sessions() -> Response:
 
 
 @bp.get("/<patient_uuid>/records")
-@with_security(**_READ)
+@with_security(action='Action::"care-episode:list"', rate_limit=settings.care_episode_read_rate_limit)
 def get_records(patient_uuid: str) -> Response:
     with SessionLocal() as db:
         return jsonify({"items": patient_records(db, patient_uuid)})
 
 
 @bp.get("/<patient_uuid>/appointments")
-@with_security(**_READ)
+@with_security(action='Action::"care-episode:list"', rate_limit=settings.care_episode_read_rate_limit)
 def get_appointments(patient_uuid: str) -> Response:
     with SessionLocal() as db:
         return jsonify({"items": patient_appointments(db, patient_uuid)})
 
 
 @bp.get("/<patient_uuid>/messages")
-@with_security(**_READ)
+@with_security(action='Action::"care-episode:list"', rate_limit=settings.care_episode_read_rate_limit)
 def get_messages(patient_uuid: str) -> Response:
     with SessionLocal() as db:
         return jsonify({"items": patient_inbox_messages(db, patient_uuid)})
 
 
 @bp.post("/<patient_uuid>/appointments")
-@with_security(**_WRITE)
+@with_security(action='Action::"care-episode:create"', rate_limit=settings.care_episode_write_rate_limit)
 def post_appointments(patient_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
     items = payload.get("items")
@@ -91,7 +77,7 @@ def post_appointments(patient_uuid: str) -> Response:
 
 
 @bp.patch("/<patient_uuid>/messages/<message_uuid>/read")
-@with_security(**_WRITE)
+@with_security(action='Action::"care-episode:create"', rate_limit=settings.care_episode_write_rate_limit)
 def patch_message_read(patient_uuid: str, message_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
     with SessionLocal() as db:
@@ -107,7 +93,7 @@ def patch_message_read(patient_uuid: str, message_uuid: str) -> Response:
 
 
 @bp.post("/<patient_uuid>/messages")
-@with_security(**_WRITE)
+@with_security(action='Action::"care-episode:create"', rate_limit=settings.care_episode_write_rate_limit)
 def post_messages(patient_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
     items = payload.get("items")
@@ -124,7 +110,7 @@ def post_messages(patient_uuid: str) -> Response:
 
 
 @bp.post("/invites")
-@with_security(**_WRITE)
+@with_security(rate_limit=settings.care_episode_write_rate_limit)
 def post_invite() -> Response:
     payload = request.get_json(silent=True) or {}
     required = ("patient_uuid", "procedure_type", "care_window_days")
@@ -136,7 +122,7 @@ def post_invite() -> Response:
 
 
 @bp.post("/sessions")
-@with_security(**_WRITE)
+@with_security(rate_limit=settings.care_episode_write_rate_limit)
 def post_session() -> Response:
     payload = request.get_json(silent=True) or {}
     required = (
@@ -177,7 +163,7 @@ def _authorize_clone_demo(active_actor: str, patient_uuid: str) -> None:
 
 
 @bp.post("/<patient_uuid>/clone-demo")
-@with_security(**_WRITE)
+@with_security(action='Action::"care-episode:create"', rate_limit=settings.care_episode_write_rate_limit)
 def post_clone_demo(patient_uuid: str) -> Response:
     active_actor = (request.headers.get("X-Active-Actor") or "").strip().lower()
     _authorize_clone_demo(active_actor, patient_uuid)
@@ -202,7 +188,7 @@ def post_clone_demo(patient_uuid: str) -> Response:
 
 
 @bp.post("/<patient_uuid>/records")
-@with_security(**_WRITE)
+@with_security(action='Action::"care-episode:create"', rate_limit=settings.care_episode_write_rate_limit)
 def post_records(patient_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
     records = payload.get("items")
@@ -216,5 +202,3 @@ def post_records(patient_uuid: str) -> Response:
             changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"),
         )
     return jsonify(item), 201
-
-
