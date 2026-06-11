@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from sqlalchemy import text
 from werkzeug.exceptions import BadRequest, NotFound
 
 from src.models.care_episode import (
@@ -110,6 +111,58 @@ def patient_has_demo_dashboard(db, patient_id: uuid.UUID) -> bool:
     return has_appointment and has_message
 
 
+def _lock_patient_demo_clone(db, patient_id: uuid.UUID) -> None:
+    """Serialize concurrent clone-demo requests for the same patient."""
+    lock_key = patient_id.int % ((2**63) - 1)
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+
+
+def _dedupe_demo_inbox_messages(db, patient_id: uuid.UUID) -> int:
+    """Drop duplicate inbox rows with the same sender and body, keeping the newest."""
+    rows = (
+        db.query(CareEpisodeInboxMessage)
+        .filter(CareEpisodeInboxMessage.patient_uuid == patient_id)
+        .order_by(
+            CareEpisodeInboxMessage.sent_at.desc(),
+            CareEpisodeInboxMessage.message_uuid.desc(),
+        )
+        .all()
+    )
+    seen: set[tuple[str, str]] = set()
+    removed = 0
+    for row in rows:
+        key = (row.sender_display_name, row.body)
+        if key in seen:
+            db.delete(row)
+            removed += 1
+        else:
+            seen.add(key)
+    return removed
+
+
+def _dedupe_demo_appointments(db, patient_id: uuid.UUID) -> int:
+    """Drop duplicate appointments for the same clinician and specialty, keeping the newest."""
+    rows = (
+        db.query(CareEpisodeAppointment)
+        .filter(CareEpisodeAppointment.patient_uuid == patient_id)
+        .order_by(
+            CareEpisodeAppointment.scheduled_at.desc(),
+            CareEpisodeAppointment.appointment_uuid.desc(),
+        )
+        .all()
+    )
+    seen: set[tuple[str, str]] = set()
+    removed = 0
+    for row in rows:
+        key = (row.clinician_display_name, row.specialty)
+        if key in seen:
+            db.delete(row)
+            removed += 1
+        else:
+            seen.add(key)
+    return removed
+
+
 def _refresh_demo_dashboard_times(
     db,
     target_id: uuid.UUID,
@@ -117,6 +170,8 @@ def _refresh_demo_dashboard_times(
     changed_by_uuid: uuid.UUID,
     changed_by_type: int,
 ) -> tuple[int, int]:
+    _dedupe_demo_appointments(db, target_id)
+    _dedupe_demo_inbox_messages(db, target_id)
     now = datetime.now(UTC)
     appointments = (
         db.query(CareEpisodeAppointment)
@@ -162,6 +217,22 @@ def clone_patient_demo_from_template(
 
     actor_id = uuid.UUID(str(changed_by_uuid))
 
+    template_session = db.get(CareEpisodeSession, source_id)
+    if template_session is None:
+        raise NotFound("demo template patient is not seeded")
+
+    template_records = (
+        db.query(CareEpisodeRecord).filter(CareEpisodeRecord.patient_uuid == source_id).all()
+    )
+    template_appointments = (
+        db.query(CareEpisodeAppointment).filter(CareEpisodeAppointment.patient_uuid == source_id).all()
+    )
+    template_messages = (
+        db.query(CareEpisodeInboxMessage).filter(CareEpisodeInboxMessage.patient_uuid == source_id).all()
+    )
+
+    _lock_patient_demo_clone(db, target_id)
+
     if patient_has_demo_dashboard(db, target_id):
         appt_count, msg_count = _refresh_demo_dashboard_times(
             db,
@@ -179,21 +250,6 @@ def clone_patient_demo_from_template(
         }
 
     repair_incomplete = patient_has_demo_marker_record(db, target_id)
-
-    template_session = db.get(CareEpisodeSession, source_id)
-    if template_session is None:
-        raise NotFound("demo template patient is not seeded")
-
-    template_records = (
-        db.query(CareEpisodeRecord).filter(CareEpisodeRecord.patient_uuid == source_id).all()
-    )
-    template_appointments = (
-        db.query(CareEpisodeAppointment).filter(CareEpisodeAppointment.patient_uuid == source_id).all()
-    )
-    template_messages = (
-        db.query(CareEpisodeInboxMessage).filter(CareEpisodeInboxMessage.patient_uuid == source_id).all()
-    )
-
     now = datetime.now(UTC)
 
     if db.get(CareEpisodeSession, target_id) is None:
@@ -213,6 +269,7 @@ def clone_patient_demo_from_template(
             changed_by_uuid=changed_by_uuid,
             changed_by_type=changed_by_type,
         )
+    db.flush()
 
     records_added = 0
     if not repair_incomplete:
@@ -232,16 +289,15 @@ def clone_patient_demo_from_template(
             )
         records_added = len(template_records)
 
-    existing_appointments = (
+    _dedupe_demo_appointments(db, target_id)
+    appointment_count = (
         db.query(CareEpisodeAppointment.appointment_uuid)
         .filter(CareEpisodeAppointment.patient_uuid == target_id)
-        .limit(1)
-        .first()
-        is not None
+        .count()
     )
     appointments_added = 0
     sorted_appointments = sorted(template_appointments, key=lambda r: r.scheduled_at)
-    if not existing_appointments:
+    if appointment_count == 0:
         for idx, row in enumerate(sorted_appointments):
             shifted = scheduled_at_for_demo_appointment(now, idx)
             db.add(
@@ -258,16 +314,15 @@ def clone_patient_demo_from_template(
             )
         appointments_added = len(template_appointments)
 
-    existing_messages = (
+    _dedupe_demo_inbox_messages(db, target_id)
+    message_count = (
         db.query(CareEpisodeInboxMessage.message_uuid)
         .filter(CareEpisodeInboxMessage.patient_uuid == target_id)
-        .limit(1)
-        .first()
-        is not None
+        .count()
     )
     messages_added = 0
     sorted_messages = sorted(template_messages, key=lambda r: r.sent_at)
-    if not existing_messages:
+    if message_count == 0:
         for idx, row in enumerate(sorted_messages):
             shifted_sent = sent_at_for_demo_inbox_message(now, idx)
             read_at = read_at_for_demo_inbox_message(now, idx, row.read_at is not None)
@@ -284,6 +339,13 @@ def clone_patient_demo_from_template(
                 )
             )
         messages_added = len(template_messages)
+    elif message_count > 0:
+        _refresh_demo_dashboard_times(
+            db,
+            target_id,
+            changed_by_uuid=actor_id,
+            changed_by_type=changed_by_type,
+        )
 
     db.commit()
     return {
