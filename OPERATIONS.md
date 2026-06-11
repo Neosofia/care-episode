@@ -1,6 +1,6 @@
 # Operations
 
-## Local Development
+## Local development
 
 1. Sync dependencies:
 
@@ -8,64 +8,66 @@
    uv sync
    ```
 
-2. Configure database URLs in `.env` (copy from `.env.example`). Use different users for migration and runtime:
+2. Configure environment (copy `.env.example` to `.env`). Required: database URLs, `JWT_AUDIENCE=care-episode`, and `JWT_JWKS_URI` or `JWT_PUBLIC_KEY`. For chat proxy locally, also set **`CARE_EPISODE_CLIENT_SECRET`** and ensure authentication has `care-episode` credentials and a `chat` registry entry (see `cdp/scripts/seed_services.py`).
+
+   Compose example (Postgres on host port **5015**):
 
    ```dotenv
-   MIGRATION_DATABASE_URL=postgresql+psycopg://template:<superuser-password>@localhost:5432/python_template
-   APP_DATABASE_URL=postgresql+psycopg://app:<app-password>@localhost:5432/python_template
+   MIGRATION_DATABASE_URL=postgresql+psycopg://care_episode_template:change-me@localhost:5015/cdp_care_episode
+   APP_DATABASE_URL=postgresql+psycopg://app:change-me@localhost:5015/cdp_care_episode
+   JWT_JWKS_URI=http://localhost:8014/.well-known/jwks.json
+   JWT_AUDIENCE=care-episode
+   CARE_EPISODE_CLIENT_SECRET=change-me
    ```
 
-   Start Postgres, then apply migrations:
+3. Apply migrations:
 
    ```bash
    uv run alembic upgrade head
    ```
 
-   Requires audit SQL from `templates/sql/audit` (monorepo) or `ghcr.io/neosofia/sql-template:v0.6.0+` in production images.
-
-3. Run the test suite:
+4. Run tests:
 
    ```bash
-   uv run --dev -m pytest -q
+   uv run pytest -q
    ```
 
-4. Start the service locally:
+5. Start the service (default port **8015**):
 
    ```bash
    uv run --dev -m gunicorn -c src/gunicorn.py src.app:app
+   curl http://localhost:8015/health
    ```
 
-5. Check health:
+6. Local JWT for protected routes:
 
-   ```bash
-   curl http://localhost:8900/health
-   ```
-
-6. Generate a local JWT to test secure API endpoints:
-
-   You will need a valid RS256 token matching the local application's keys to access protected endpoints. Run our utility script to generate an RSA Keypair and Token automatically:
-   
    ```bash
    uv run scripts/gen_dev_jwt.py --type Patient --sub p1
    ```
-   
-   The script will output the exact `JWT_PUBLIC_KEY` variable you need to place in your `.env` to start the server properly, along with the Bearer token for your HTTP requests.
 
-## Docker Build & Run
+## Patient chat proxy
 
-In this monorepo, build from the repository root:
+Channel clients (CDP patient chat UI, future SMS/app adapters) open chat through this service — not Chat directly:
+
+| Step | Endpoint | Auth |
+|------|----------|------|
+| Open interaction | `POST /api/v1/care-episodes/{patient_uuid}/chat/interactions` | Patient JWT |
+| Session start / turns | `POST …/chat/interactions/{chat_interaction_uuid}/completions` | Patient JWT (passthrough to Chat) |
+
+Create uses a **care-episode service token** to Chat internally; completions forward the caller's patient JWT. Chat base URL is resolved from the authentication service registry (`slug: chat`). When Chat inference is unavailable, completions return **503** (passthrough); the patient UI shows an unavailable state — no stub replies.
+
+Interaction create returns `care_episode_uuid` (active episode identifier; in the demo session model this equals `patient_uuid`) and `chat_interaction_uuid`.
+
+## Docker build and run
+
+From this repository:
 
 ```bash
-docker build -f templates/python/service/Dockerfile --target runtime -t python-template-dev .
+docker build --target runtime -t care-episode:local .
+docker run -d --rm -p 8015:8015 -e ENV=development --env-file .env --name care-episode-dev care-episode:local
 ```
 
-To run the container locally, mount the port and explicitly set `ENV=development` to disable the forced HTTPS redirects from Talisman:
-
-```bash
-docker run -d --rm -p 8900:8900 -e ENV=development --env-file .env --name python-template-dev python-template-dev
-```
-
-Before using this outside this monorepo, replace the local `authorization-in-the-middle` source override in `pyproject.toml` with an immutable published artifact.
+Run migrations before or via `preDeployCommand` (see `railway.toml`).
 
 ## Public cloud deployment
 
@@ -73,27 +75,15 @@ Shared JWT, JWKS, CORS, healthcheck, and PaaS networking guidance:
 
 **→ [infrastructure/public-cloud/OPERATIONS.md](https://github.com/Neosofia/infrastructure/blob/main/public-cloud/OPERATIONS.md)**
 
-For Railway IaC, start from `railway.toml` in this template directory. It provisions Postgres and runs Alembic via `preDeployCommand`.
+**Service-specific notes:**
 
-**Template-specific notes:**
+- **Port:** `8015` (override with `PORT`).
+- **Audience:** `JWT_AUDIENCE` must include `care-episode`.
+- **Chat proxy:** `CARE_EPISODE_CLIENT_SECRET` required in every environment that serves the patient chat proxy.
+- **Healthcheck:** exempt `/health` from Talisman HTTPS redirect in forked deployments.
 
-- **Local JWKS:** `JWT_JWKS_URI=http://identity:8014/.well-known/jwks.json` (adjust host and port to your identity provider).
-- **Cloud audience:** `JWT_AUDIENCE=python-template`; configure your token issuer to include this audience.
-- **Healthcheck:** forked services should exempt `/health` from Talisman HTTPS redirect (see infrastructure guide).
-- **CORS preflight cache:** OPTIONS responses include `Access-Control-Max-Age: 86400` (24 h; Chrome caps at 2 h) so browsers cache cross-origin preflights.
+## Test matrix
 
-## Test Matrix
-
-- `tests/unit/` tests pure business logic, helpers, and pure functions without I/O or routing.
-- `tests/integration/` exercises the Flask routing, schema validation, and real un-mocked requests. Validates OpenAPI contract and response shapes.
-- `tests/integration/test_container.py` runs a real Docker container using `testcontainers` to ensure the built image responds successfully to health queries.
-- `tests/benchmark.py` stress tests concurrency, AuthN bottlenecks, and rate limiting natively.
-
-## High-Throughput Benchmarking
-
-You can profile API boundaries via `tests/benchmark.py`. This script spins up concurrent asynchronous clients to hammer the local application endpoint.
-
-When benchmarking container capacity locally via Docker:
-1. **Disable the Docker Log Driver**: Docker's default `json-file` log driver will become IO-bound at ~500 RPS as it streams massive amounts of 200 OK logs to your local hard drive. Pass `--log-driver none` to the `docker run` command to bypass this constraint for load testing.
-2. **Tune Rate Limits**: By default, `DOCUMENT_READ_RATE_LIMIT` strictly throttles to `60 per minute`. To test real server throughput, inject `-e DOCUMENT_READ_RATE_LIMIT="10000 per second"` to open the floodgates.
-3. **Set Workers**: Set `-e WEB_CONCURRENCY=X` matching CPU capacity. For example, `WEB_CONCURRENCY=16` handles 500+ sustained RPS with ~30ms latencies natively.
+- `tests/unit/` — business logic and route handlers with isolated patching.
+- `tests/integration/` — OpenAPI contract, chat proxy happy path and no-session rejection (Chat HTTP stubbed).
+- `tests/integration/test_container.py` — built image health against real Postgres.

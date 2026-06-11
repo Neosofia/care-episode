@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     care_episode_read_rate_limit: str = "120 per minute"
     care_episode_write_rate_limit: str = "60 per minute"
 
+    # Chat service proxy (patient write path; base URL resolved via auth service registry)
+    chat_service_timeout_seconds: float = Field(default=90.0, gt=0)
+
+    # Service-to-service auth and registry discovery
+    authentication_service_base_url: str = ""
+    care_episode_client_secret: str = ""
+    authentication_token_timeout_seconds: float = Field(default=10.0, gt=0)
+    service_registry_cache_ttl_seconds: int = Field(default=60, ge=0)
+
     # Gunicorn settings
     web_concurrency: int = Field(default=2, ge=1)
     gunicorn_threads: int = Field(default=2, ge=1)
@@ -107,6 +116,16 @@ class Settings(BaseSettings):
 
         if not self.jwt_public_key and not self.jwt_jwks_uri:
             raise ValueError("JWT_PUBLIC_KEY or JWT_JWKS_URI must be configured for token validation")
+
+        if not self.authentication_service_base_url.strip():
+            jwks = (self.jwt_jwks_uri or "").strip()
+            suffix = "/.well-known/jwks.json"
+            if jwks.endswith(suffix):
+                object.__setattr__(
+                    self,
+                    "authentication_service_base_url",
+                    jwks[: -len(suffix)].rstrip("/"),
+                )
 
         # Decode Base64 PEM keys passed in via environment variables
         if self.jwt_public_key and self.jwt_public_key != "DEFAULT_PUBLIC_KEY":

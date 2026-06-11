@@ -15,7 +15,13 @@ def test_openapi_spec_contains_core_paths():
     assert "/health" in spec["paths"]
     assert "/api/v1/care-episodes/sessions" in spec["paths"]
     assert "/api/v1/care-episodes/{patient_uuid}/clone-demo" in spec["paths"]
+    assert "/api/v1/care-episodes/{patient_uuid}/chat/interactions" in spec["paths"]
+    assert (
+        "/api/v1/care-episodes/{patient_uuid}/chat/interactions/{chat_interaction_uuid}/completions"
+        in spec["paths"]
+    )
     assert "/api/v1/care-episodes/{patient_uuid}/transcript" not in spec["paths"]
+    assert spec["info"]["version"] == "0.4.0"
 
 
 def test_openapi_spec_defines_session_risk_level():
@@ -26,6 +32,15 @@ def test_openapi_spec_defines_session_risk_level():
     assert "risk_level" in session["required"]
     assert session["properties"]["risk_level"]["enum"] == ["high", "medium", "low"]
     assert "featured" not in session["properties"]
+
+
+def test_openapi_spec_defines_chat_interaction_create_response():
+    root = Path(__file__).resolve().parents[3]
+    spec = json.loads((root / "openapi.json").read_text())
+
+    create_response = spec["components"]["schemas"]["ChatInteractionCreateResponse"]
+    assert "care_episode_uuid" in create_response["required"]
+    assert "chat_interaction_uuid" in create_response["required"]
 
 
 def test_openapi_spec_defines_error_schema():

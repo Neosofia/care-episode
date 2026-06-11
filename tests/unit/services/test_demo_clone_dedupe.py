@@ -10,6 +10,7 @@ from src.services.demo_clone_service import (
 
 UTC = timezone.utc
 PATIENT = UUID("00000000-0000-7000-8000-000000000099")
+ACTOR = UUID("00000000-0000-7000-8000-000000000003")
 
 
 def _mock_query(rows):
@@ -41,10 +42,17 @@ def test_dedupe_inbox_messages_keeps_newest_per_sender_and_body():
     ]
     db = _mock_query(rows)
 
-    removed = _dedupe_demo_inbox_messages(db, PATIENT)
+    removed = _dedupe_demo_inbox_messages(
+        db,
+        PATIENT,
+        changed_by_uuid=ACTOR,
+        changed_by_type=2,
+    )
 
     assert removed == 1
-    db.delete.assert_called_once_with(rows[1])
+    assert rows[1].change_type == 3
+    assert rows[1].changed_by_uuid == ACTOR
+    assert rows[1].changed_by_type == 2
 
 
 def test_dedupe_appointments_keeps_newest_per_clinician_and_specialty():
@@ -64,7 +72,14 @@ def test_dedupe_appointments_keeps_newest_per_clinician_and_specialty():
     ]
     db = _mock_query(rows)
 
-    removed = _dedupe_demo_appointments(db, PATIENT)
+    removed = _dedupe_demo_appointments(
+        db,
+        PATIENT,
+        changed_by_uuid=ACTOR,
+        changed_by_type=2,
+    )
 
     assert removed == 1
-    db.delete.assert_called_once_with(rows[1])
+    assert rows[1].change_type == 3
+    assert rows[1].changed_by_uuid == ACTOR
+    assert rows[1].changed_by_type == 2

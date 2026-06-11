@@ -2,7 +2,7 @@
 
 Authoritative store for **procedure-scoped post-discharge care episodes** on the platform. Each episode groups a patient, procedure reference, care window, invite linkage, and lifecycle status so clinician and patient experiences can answer which recovery window applies without mixing separate procedures for the same person.
 
-The CDP clinician and patient apps call this service for active session summaries, demo enrichment (records, appointments, inbox), and post-care invite flows. Authentication establishes identity; the User Service holds platform roles; the Chat Service stores conversations by user and interaction. This service owns episode-shaped clinical context and dashboard data that product UIs compose alongside chat — not message transcripts themselves. Downstream lifecycle subscribers receive identifier-only events when episodes open or close.
+The CDP clinician and patient apps call this service for active session summaries, demo enrichment (records, appointments, inbox), post-care invite flows, and **patient chat proxy** (episode validation, authoritative interaction context, and Chat interaction create in one server-side call). Authentication establishes identity; the User Service holds platform roles; the Chat Service stores conversations by user and interaction. This service owns episode-shaped clinical context and dashboard data that product UIs compose alongside chat — not message transcripts themselves. Downstream lifecycle subscribers receive identifier-only events when episodes open or close.
 
 ## Resources
 

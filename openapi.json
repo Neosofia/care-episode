@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Care Episode Service API",
-    "version": "0.2.0",
-    "description": "Care episodes, demo sessions, records, appointments, and inbox messages."
+    "version": "0.4.0",
+    "description": "Care episodes, demo sessions, records, appointments, inbox messages, and patient chat proxy."
   },
   "paths": {
     "/health": {
@@ -807,6 +807,165 @@
           }
         }
       }
+    },
+    "/api/v1/care-episodes/{patient_uuid}/chat/interactions": {
+      "post": {
+        "operationId": "createPatientChatInteraction",
+        "summary": "Create a patient chat interaction",
+        "description": "Validates an active care episode session, builds authoritative interaction context server-side, and creates a chat interaction via service-to-service call. Does not call Chat when no session exists.",
+        "parameters": [
+          {
+            "name": "patient_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Chat interaction created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatInteractionCreateResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No active care episode session for patient",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Chat service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/care-episodes/{patient_uuid}/chat/interactions/{chat_interaction_uuid}/completions": {
+      "post": {
+        "operationId": "proxyPatientChatCompletion",
+        "summary": "Proxy a patient chat completion turn",
+        "description": "Forwards the patient JWT to Chat for session start or message completions after validating the care episode session.",
+        "parameters": [
+          {
+            "name": "patient_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "chat_interaction_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionProxyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completion result from Chat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletionProxyResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No active care episode session for patient",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Chat service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1270,6 +1429,74 @@
             "type": "integer"
           }
         }
+      },
+      "ChatInteractionCreateResponse": {
+        "type": "object",
+        "required": [
+          "care_episode_uuid",
+          "chat_interaction_uuid",
+          "user_uuid",
+          "started_at"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "care_episode_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Active care episode identifier. In the demo session model this equals patient_uuid."
+          },
+          "chat_interaction_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_message_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "message_count": {
+            "type": "integer"
+          },
+          "preview": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ChatCompletionProxyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "session_start": {
+            "type": "boolean",
+            "description": "When true, primes the interaction with an AI greeting."
+          },
+          "content": {
+            "type": "string",
+            "description": "Patient message text; required unless session_start is true."
+          },
+          "channel": {
+            "type": "integer",
+            "description": "Chat channel enum value forwarded to Chat."
+          }
+        }
+      },
+      "ChatCompletionProxyResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Opaque completion payload returned by Chat (messages, intervention flag, etc.)."
       }
     }
   }

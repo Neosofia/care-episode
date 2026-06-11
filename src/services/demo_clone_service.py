@@ -117,7 +117,19 @@ def _lock_patient_demo_clone(db, patient_id: uuid.UUID) -> None:
     db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
 
 
-def _dedupe_demo_inbox_messages(db, patient_id: uuid.UUID) -> int:
+def _soft_delete_row(row, *, changed_by_uuid: uuid.UUID, changed_by_type: int) -> None:
+    row.change_type = 3
+    row.changed_by_uuid = changed_by_uuid
+    row.changed_by_type = changed_by_type
+
+
+def _dedupe_demo_inbox_messages(
+    db,
+    patient_id: uuid.UUID,
+    *,
+    changed_by_uuid: uuid.UUID,
+    changed_by_type: int,
+) -> int:
     """Drop duplicate inbox rows with the same sender and body, keeping the newest."""
     rows = (
         db.query(CareEpisodeInboxMessage)
@@ -133,14 +145,24 @@ def _dedupe_demo_inbox_messages(db, patient_id: uuid.UUID) -> int:
     for row in rows:
         key = (row.sender_display_name, row.body)
         if key in seen:
-            db.delete(row)
+            _soft_delete_row(
+                row,
+                changed_by_uuid=changed_by_uuid,
+                changed_by_type=changed_by_type,
+            )
             removed += 1
         else:
             seen.add(key)
     return removed
 
 
-def _dedupe_demo_appointments(db, patient_id: uuid.UUID) -> int:
+def _dedupe_demo_appointments(
+    db,
+    patient_id: uuid.UUID,
+    *,
+    changed_by_uuid: uuid.UUID,
+    changed_by_type: int,
+) -> int:
     """Drop duplicate appointments for the same clinician and specialty, keeping the newest."""
     rows = (
         db.query(CareEpisodeAppointment)
@@ -156,7 +178,11 @@ def _dedupe_demo_appointments(db, patient_id: uuid.UUID) -> int:
     for row in rows:
         key = (row.clinician_display_name, row.specialty)
         if key in seen:
-            db.delete(row)
+            _soft_delete_row(
+                row,
+                changed_by_uuid=changed_by_uuid,
+                changed_by_type=changed_by_type,
+            )
             removed += 1
         else:
             seen.add(key)
@@ -170,8 +196,18 @@ def _refresh_demo_dashboard_times(
     changed_by_uuid: uuid.UUID,
     changed_by_type: int,
 ) -> tuple[int, int]:
-    _dedupe_demo_appointments(db, target_id)
-    _dedupe_demo_inbox_messages(db, target_id)
+    _dedupe_demo_appointments(
+        db,
+        target_id,
+        changed_by_uuid=changed_by_uuid,
+        changed_by_type=changed_by_type,
+    )
+    _dedupe_demo_inbox_messages(
+        db,
+        target_id,
+        changed_by_uuid=changed_by_uuid,
+        changed_by_type=changed_by_type,
+    )
     now = datetime.now(UTC)
     appointments = (
         db.query(CareEpisodeAppointment)
@@ -289,7 +325,12 @@ def clone_patient_demo_from_template(
             )
         records_added = len(template_records)
 
-    _dedupe_demo_appointments(db, target_id)
+    _dedupe_demo_appointments(
+        db,
+        target_id,
+        changed_by_uuid=actor_id,
+        changed_by_type=changed_by_type,
+    )
     appointment_count = (
         db.query(CareEpisodeAppointment.appointment_uuid)
         .filter(CareEpisodeAppointment.patient_uuid == target_id)
@@ -314,7 +355,12 @@ def clone_patient_demo_from_template(
             )
         appointments_added = len(template_appointments)
 
-    _dedupe_demo_inbox_messages(db, target_id)
+    _dedupe_demo_inbox_messages(
+        db,
+        target_id,
+        changed_by_uuid=actor_id,
+        changed_by_type=changed_by_type,
+    )
     message_count = (
         db.query(CareEpisodeInboxMessage.message_uuid)
         .filter(CareEpisodeInboxMessage.patient_uuid == target_id)

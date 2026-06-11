@@ -4,9 +4,10 @@ import datetime
 
 from authorization_in_the_middle.security import with_security
 from flask import Blueprint, Response, g, jsonify, request
-from werkzeug.exceptions import BadRequest, Forbidden, NotFound
+from werkzeug.exceptions import BadGateway, BadRequest, Forbidden, NotFound
 
 from src.bootstrap.config import settings
+from src.bootstrap.request_telemetry import log_request_handled
 from src.db.engine import SessionLocal
 from src.services.care_episode_service import (
     create_episode_invite,
@@ -20,6 +21,7 @@ from src.services.care_episode_service import (
     replace_records,
     upsert_session,
 )
+from src.services.chat_proxy_service import create_chat_interaction, proxy_chat_completion
 from src.services.demo_clone_service import clone_patient_demo_from_template
 
 bp = Blueprint("care-episodes", __name__, url_prefix="/api/v1/care-episodes")
@@ -185,6 +187,39 @@ def post_clone_demo(patient_uuid: str) -> Response:
         )
     status = 201 if result.get("cloned") else 200
     return jsonify(result), status
+
+
+@bp.post("/<patient_uuid>/chat/interactions")
+@with_security(action='Action::"care-episode:create"', rate_limit=settings.care_episode_write_rate_limit)
+def post_chat_interaction(patient_uuid: str) -> Response:
+    try:
+        with SessionLocal() as db:
+            item = create_chat_interaction(db, patient_uuid)
+    except NotFound:
+        log_request_handled("chat_interaction_create", 404, outcome="no_session")
+        raise
+    except BadGateway:
+        log_request_handled("chat_interaction_create", 502, outcome="chat_downstream")
+        raise
+    log_request_handled("chat_interaction_create", 201, outcome="success")
+    return jsonify(item), 201
+
+
+@bp.post("/<patient_uuid>/chat/interactions/<chat_interaction_uuid>/completions")
+@with_security(action='Action::"care-episode:create"', rate_limit=settings.care_episode_write_rate_limit)
+def post_chat_completion(patient_uuid: str, chat_interaction_uuid: str) -> Response:
+    payload = request.get_json(silent=True) or {}
+    try:
+        with SessionLocal() as db:
+            item = proxy_chat_completion(db, patient_uuid, chat_interaction_uuid, payload)
+    except NotFound:
+        log_request_handled("chat_completion_proxy", 404, outcome="no_session")
+        raise
+    except BadGateway:
+        log_request_handled("chat_completion_proxy", 502, outcome="chat_downstream")
+        raise
+    log_request_handled("chat_completion_proxy", 200, outcome="success")
+    return jsonify(item)
 
 
 @bp.post("/<patient_uuid>/records")
