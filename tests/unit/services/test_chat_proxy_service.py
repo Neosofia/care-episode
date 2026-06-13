@@ -5,8 +5,8 @@ import pytest
 from flask import Flask, g
 from werkzeug.exceptions import NotFound
 
-from src.models.care_episode import CareEpisodeSession
-from src.services.chat_proxy_service import create_chat_interaction, proxy_chat_completion, require_session
+from src.models.care_episode import CareEpisodeRecovery
+from src.services.chat_proxy_service import create_chat_interaction, proxy_chat_completion, require_recovery
 
 pytestmark = pytest.mark.unit
 
@@ -14,16 +14,16 @@ PATIENT = "00000000-0000-7000-8000-000000000001"
 INTERACTION = "00000000-0000-7000-8000-000000000002"
 
 
-def _session_row() -> CareEpisodeSession:
+def _recovery_row() -> CareEpisodeRecovery:
     import datetime
 
-    return CareEpisodeSession(
+    return CareEpisodeRecovery(
         patient_uuid=uuid.UUID(PATIENT),
         display_code="PT-001",
         display_name="Alex Patient",
         surgery="Knee scope",
         procedure_date=datetime.date.today(),
-        session_id="sess-1",
+        recovery_id="sess-1",
         risk_level="low",
         tenant_uuid=uuid.UUID("00000000-0000-7000-8000-000000000010"),
         changed_by_uuid=uuid.UUID("00000000-0000-7000-8000-000000000000"),
@@ -31,17 +31,17 @@ def _session_row() -> CareEpisodeSession:
     )
 
 
-def test_require_session_not_found():
+def test_require_recovery_not_found():
     db = MagicMock()
     db.get.return_value = None
     with pytest.raises(NotFound):
-        require_session(db, PATIENT)
+        require_recovery(db, PATIENT)
 
 
 @patch("src.services.chat_proxy_service.chat_client.create_interaction")
 def test_create_chat_interaction(mock_create):
     db = MagicMock()
-    db.get.return_value = _session_row()
+    db.get.return_value = _recovery_row()
     mock_create.return_value = {"chat_interaction_uuid": INTERACTION, "user_uuid": PATIENT}
     result = create_chat_interaction(db, PATIENT)
     assert result["chat_interaction_uuid"] == INTERACTION
@@ -50,7 +50,7 @@ def test_create_chat_interaction(mock_create):
     args, kwargs = mock_create.call_args
     assert args[0] == PATIENT
     assert kwargs["context"]["procedure_name"] == "Knee scope"
-    assert kwargs["context"]["tenant_uuid"] == str(_session_row().tenant_uuid)
+    assert kwargs["context"]["tenant_uuid"] == str(_recovery_row().tenant_uuid)
 
 
 @patch("src.services.chat_proxy_service.chat_client.create_interaction")
@@ -58,7 +58,7 @@ def test_create_chat_interaction_prefers_jwt_tenant(mock_create):
     app = Flask(__name__)
     jwt_tenant = "00000000-0000-7000-8000-000000000099"
     db = MagicMock()
-    db.get.return_value = _session_row()
+    db.get.return_value = _recovery_row()
     mock_create.return_value = {"chat_interaction_uuid": INTERACTION, "user_uuid": PATIENT}
     with app.test_request_context("/"):
         g.jwt_claims = {
@@ -69,12 +69,17 @@ def test_create_chat_interaction_prefers_jwt_tenant(mock_create):
     assert mock_create.call_args.kwargs["context"]["tenant_uuid"] == jwt_tenant
 
 
+@patch("src.services.chat_proxy_service.update_risk_after_patient_chat_message")
 @patch("src.services.chat_proxy_service.chat_client.create_completion")
-def test_proxy_chat_completion_updates_last_activity(mock_create):
+def test_proxy_chat_completion_updates_last_activity(mock_create, mock_evaluate):
     db = MagicMock()
-    session = _session_row()
-    db.get.return_value = session
-    mock_create.return_value = {"message": "hello"}
+    recovery = _recovery_row()
+    db.get.return_value = recovery
+    mock_create.return_value = {
+        "message": "hello",
+        "user_message": {"message_uuid": "00000000-0000-7000-8000-000000000099"},
+    }
+    mock_evaluate.return_value = {"risk_level": "low", "escalated": False}
     result = proxy_chat_completion(
         db,
         PATIENT,
@@ -82,6 +87,24 @@ def test_proxy_chat_completion_updates_last_activity(mock_create):
         {"content": "Hi"},
     )
     assert result["message"] == "hello"
+    assert result["risk_evaluation"]["risk_level"] == "low"
     mock_create.assert_called_once_with(PATIENT, INTERACTION, {"content": "Hi"})
-    assert session.last_activity
+    mock_evaluate.assert_called_once()
+    assert recovery.last_activity
     db.commit.assert_called_once()
+
+
+@patch("src.services.chat_proxy_service.update_risk_after_patient_chat_message")
+@patch("src.services.chat_proxy_service.chat_client.create_completion")
+def test_proxy_chat_completion_skips_risk_on_session_start(mock_create, mock_evaluate):
+    db = MagicMock()
+    db.get.return_value = _recovery_row()
+    mock_create.return_value = {"message": "Welcome", "assistant_message": {"message_uuid": "a1"}}
+    result = proxy_chat_completion(
+        db,
+        PATIENT,
+        INTERACTION,
+        {"session_start": True},
+    )
+    assert "risk_evaluation" not in result
+    mock_evaluate.assert_not_called()

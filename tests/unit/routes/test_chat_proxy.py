@@ -39,7 +39,7 @@ def test_post_chat_interaction(mock_session, mock_create_interaction, client, rs
     }
     response = client.post(
         f"/api/v1/care-episodes/{PATIENT}/chat/interactions",
-        headers=_auth_headers(rsa_keypair),
+        headers=_auth_headers(rsa_keypair, sub=PATIENT),
         base_url="https://localhost",
     )
     assert response.status_code == 201
@@ -54,7 +54,7 @@ def test_post_chat_completion(mock_session, mock_proxy, client, rsa_keypair):
     response = client.post(
         f"/api/v1/care-episodes/{PATIENT}/chat/interactions/{INTERACTION}/completions",
         json={"content": "I have pain"},
-        headers=_auth_headers(rsa_keypair),
+        headers=_auth_headers(rsa_keypair, sub=PATIENT),
         base_url="https://localhost",
     )
     assert response.status_code == 200

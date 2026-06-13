@@ -26,7 +26,7 @@ def test_health_allows_plain_http_in_production(rsa_keypair):
         response = create_app(
             {
                 "TESTING": True,
-                "TIER1_ACTOR_CLASSES": frozenset({"operator", "study", "clinician", "patient"}),
+                "TIER1_ACTOR_CLASSES": frozenset({"operator", "study", "clinician", "patient", "demo"}),
             }
         ).test_client().get("/health")
         assert response.status_code == 200

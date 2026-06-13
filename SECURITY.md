@@ -4,7 +4,7 @@ This service follows the [Neosofia Service Security Baseline](https://github.com
 
 This document covers only what is specific to the Care Episode Service.
 
-The Care Episode Service is the **authoritative store for procedure-scoped care windows** — session summaries, demo enrichment, invite linkage, and episode-shaped context consumed by Chat and clinician experiences. It does not store message transcripts.
+The Care Episode Service is the **authoritative store for procedure-scoped care windows** — recovery summaries, demo enrichment, invite linkage, and episode-shaped context consumed by Chat and clinician experiences. It does not store message transcripts.
 
 To report any security-related issue please email security@neosofia.tech — do not create a public issue.
 
@@ -14,7 +14,7 @@ To report any security-related issue please email security@neosofia.tech — do 
 
 | Concern | This service | Owner elsewhere |
 |---------|--------------|-----------------|
-| Care episode / session grouping | **Source of truth** (demo session model) | — |
+| Care episode / session grouping | **Source of truth** (demo recovery model) | — |
 | Message transcripts | — | **Chat** |
 | JWT issuance | — | **Authentication** |
 | Tier-2 roles and user registry | — | **User** |
@@ -29,7 +29,7 @@ To report any security-related issue please email security@neosofia.tech — do 
 | Caller identity | Platform JWT from **Authentication** |
 | Authorization | Fail-closed Cedar in `policies/policy.cedar`, evaluated in-process via `authorization-in-the-middle` |
 | Public surface | Only `GET /health` is unauthenticated |
-| Patient chat proxy | `POST …/chat/interactions` — session row must exist before any Chat HTTP call |
+| Patient chat proxy | `POST …/chat/interactions` — recovery row must exist before any Chat HTTP call |
 | Context injection | Interaction `context` is built server-side from session fields; clients must not supply Chat context on create |
 | S2S to Chat | `CARE_EPISODE_CLIENT_SECRET` → authentication `client_credentials` with `audience=chat` for interaction create only |
 | Completions proxy | Patient JWT is forwarded to Chat; CE validates session existence only |

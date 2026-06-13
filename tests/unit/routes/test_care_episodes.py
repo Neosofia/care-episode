@@ -33,8 +33,8 @@ def _auth_headers(
     return {"Authorization": f"Bearer {_token(rsa_keypair, actors=actors, sub=sub)}"}
 
 
-def test_get_sessions_requires_auth(client):
-    response = client.get("/api/v1/care-episodes/sessions", base_url="https://localhost")
+def test_get_recoveries_requires_auth(client):
+    response = client.get("/api/v1/care-episodes/recoveries", base_url="https://localhost")
     assert response.status_code == 401
 
 
@@ -65,13 +65,13 @@ def test_patch_message_read(mock_session, mock_mark, client, rsa_keypair):
     mock_session.return_value.__enter__.return_value = MagicMock()
     message_id = str(uuid.uuid4())
     response = client.patch(
-        f"/api/v1/care-episodes/{PATIENT}/messages/{message_id}/read",
+        f"/api/v1/care-episodes/{SUB}/messages/{message_id}/read",
         json={},
-        headers=_auth_headers(rsa_keypair),
+        headers=_auth_headers(rsa_keypair, sub=SUB),
         base_url="https://localhost",
     )
     assert response.status_code == 200
-    mock_mark.assert_called_once_with(mock_session.return_value.__enter__.return_value, PATIENT, message_id, changed_by_uuid=PATIENT)
+    mock_mark.assert_called_once_with(mock_session.return_value.__enter__.return_value, SUB, message_id, changed_by_uuid=SUB)
 
 
 @patch("src.routes.care_episodes.mark_inbox_message_read", return_value=None)
@@ -79,34 +79,21 @@ def test_patch_message_read(mock_session, mock_mark, client, rsa_keypair):
 def test_patch_message_read_not_found(mock_session, mock_mark, client, rsa_keypair):
     mock_session.return_value.__enter__.return_value = MagicMock()
     response = client.patch(
-        f"/api/v1/care-episodes/{PATIENT}/messages/{uuid.uuid4()}/read",
+        f"/api/v1/care-episodes/{SUB}/messages/{uuid.uuid4()}/read",
         json={},
-        headers=_auth_headers(rsa_keypair),
+        headers=_auth_headers(rsa_keypair, sub=SUB),
         base_url="https://localhost",
     )
     assert response.status_code == 404
 
 
-def test_post_clone_demo_rejects_unknown_actor(client, rsa_keypair):
+def test_study_actor_forbidden_on_patient_write(client, rsa_keypair):
     response = client.post(
-        f"/api/v1/care-episodes/{PATIENT}/clone-demo",
-        json={"tenant_uuid": TENANT, "display_name": "Demo", "display_code": "D-1"},
+        f"/api/v1/care-episodes/{PATIENT}/appointments",
+        json={"items": []},
         headers={
             **_auth_headers(rsa_keypair, actors=["study"]),
             "X-Active-Actor": "study",
-        },
-        base_url="https://localhost",
-    )
-    assert response.status_code == 403
-
-
-def test_post_clone_demo_patient_must_match_principal(client, rsa_keypair):
-    response = client.post(
-        f"/api/v1/care-episodes/{PATIENT}/clone-demo",
-        json={"tenant_uuid": TENANT, "display_name": "Demo", "display_code": "D-1"},
-        headers={
-            **_auth_headers(rsa_keypair, actors=["patient"], sub=SUB),
-            "X-Active-Actor": "patient",
         },
         base_url="https://localhost",
     )

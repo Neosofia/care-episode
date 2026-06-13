@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Care Episode Service API",
-    "version": "0.4.0",
-    "description": "Care episodes, demo sessions, records, appointments, inbox messages, and patient chat proxy."
+    "version": "0.6.0",
+    "description": "Care episodes, demo recoveries, records, appointments, inbox messages, and patient chat proxy."
   },
   "paths": {
     "/health": {
@@ -23,9 +23,9 @@
         }
       }
     },
-    "/api/v1/care-episodes/sessions": {
+    "/api/v1/care-episodes/recoveries": {
       "get": {
-        "operationId": "listCareEpisodeSessions",
+        "operationId": "listCareEpisodeRecoverys",
         "parameters": [
           {
             "name": "tenant_uuid",
@@ -39,11 +39,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Active care episode sessions",
+            "description": "Active care episode recoverys",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionListResponse"
+                  "$ref": "#/components/schemas/RecoveryListResponse"
                 }
               }
             }
@@ -81,13 +81,13 @@
         }
       },
       "post": {
-        "operationId": "upsertCareEpisodeSession",
+        "operationId": "upsertCareEpisodeRecovery",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpsertSessionRequest"
+                "$ref": "#/components/schemas/UpsertRecoveryRequest"
               }
             }
           }
@@ -98,7 +98,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CareEpisodeSession"
+                  "$ref": "#/components/schemas/CareEpisodeRecovery"
                 }
               }
             }
@@ -720,99 +720,11 @@
         }
       }
     },
-    "/api/v1/care-episodes/{patient_uuid}/clone-demo": {
-      "post": {
-        "operationId": "clonePatientDemoCareEpisode",
-        "parameters": [
-          {
-            "name": "patient_uuid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CloneDemoRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Demo data already present (may refresh timestamps)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CloneDemoResponse"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Demo data cloned",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CloneDemoResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/care-episodes/{patient_uuid}/chat/interactions": {
       "post": {
         "operationId": "createPatientChatInteraction",
         "summary": "Create a patient chat interaction",
-        "description": "Validates an active care episode session, builds authoritative interaction context server-side, and creates a chat interaction via service-to-service call. Does not call Chat when no session exists.",
+        "description": "Validates an active care episode recovery, builds authoritative interaction context server-side, and creates a chat interaction via service-to-service call. Does not call Chat when no recovery exists.",
         "parameters": [
           {
             "name": "patient_uuid",
@@ -846,7 +758,7 @@
             }
           },
           "404": {
-            "description": "No active care episode session for patient",
+            "description": "No active care episode recovery for patient",
             "content": {
               "application/json": {
                 "schema": {
@@ -882,7 +794,7 @@
       "post": {
         "operationId": "proxyPatientChatCompletion",
         "summary": "Proxy a patient chat completion turn",
-        "description": "Forwards the patient JWT to Chat for session start or message completions after validating the care episode session.",
+        "description": "Forwards the patient JWT to Chat for session start or message completions after validating the care episode recovery.",
         "parameters": [
           {
             "name": "patient_uuid",
@@ -935,7 +847,7 @@
             }
           },
           "404": {
-            "description": "No active care episode session for patient",
+            "description": "No active care episode recovery for patient",
             "content": {
               "application/json": {
                 "schema": {
@@ -1009,7 +921,7 @@
           }
         }
       },
-      "CareEpisodeSession": {
+      "CareEpisodeRecovery": {
         "type": "object",
         "required": [
           "patient_uuid",
@@ -1018,7 +930,7 @@
           "surgery",
           "procedure_date",
           "days_post_op",
-          "session_id",
+          "recovery_id",
           "risk_level"
         ],
         "properties": {
@@ -1042,7 +954,7 @@
           "days_post_op": {
             "type": "integer"
           },
-          "session_id": {
+          "recovery_id": {
             "type": "string"
           },
           "risk_level": {
@@ -1052,10 +964,14 @@
               "medium",
               "low"
             ]
+          },
+          "risk_summary": {
+            "type": "string",
+            "description": "Latest rolling chat risk summary for this patient, when available."
           }
         }
       },
-      "UpsertSessionRequest": {
+      "UpsertRecoveryRequest": {
         "type": "object",
         "required": [
           "patient_uuid",
@@ -1064,7 +980,7 @@
           "display_name",
           "surgery",
           "procedure_date",
-          "session_id",
+          "recovery_id",
           "risk_level"
         ],
         "properties": {
@@ -1089,7 +1005,7 @@
             "type": "string",
             "format": "date"
           },
-          "session_id": {
+          "recovery_id": {
             "type": "string"
           },
           "risk_level": {
@@ -1106,7 +1022,7 @@
           }
         }
       },
-      "SessionListResponse": {
+      "RecoveryListResponse": {
         "type": "object",
         "required": [
           "items"
@@ -1115,7 +1031,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CareEpisodeSession"
+              "$ref": "#/components/schemas/CareEpisodeRecovery"
             }
           }
         }
@@ -1155,64 +1071,6 @@
           },
           "invite_token": {
             "type": "string"
-          }
-        }
-      },
-      "CloneDemoRequest": {
-        "type": "object",
-        "required": [
-          "tenant_uuid",
-          "display_name",
-          "display_code"
-        ],
-        "properties": {
-          "tenant_uuid": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "display_name": {
-            "type": "string"
-          },
-          "display_code": {
-            "type": "string"
-          },
-          "changed_by_uuid": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
-      "CloneDemoResponse": {
-        "type": "object",
-        "required": [
-          "patient_uuid",
-          "cloned"
-        ],
-        "properties": {
-          "patient_uuid": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "cloned": {
-            "type": "boolean"
-          },
-          "reason": {
-            "type": "string"
-          },
-          "records": {
-            "type": "integer"
-          },
-          "appointments": {
-            "type": "integer"
-          },
-          "messages": {
-            "type": "integer"
-          },
-          "appointments_refreshed": {
-            "type": "integer"
-          },
-          "messages_refreshed": {
-            "type": "integer"
           }
         }
       },
@@ -1443,7 +1301,7 @@
           "care_episode_uuid": {
             "type": "string",
             "format": "uuid",
-            "description": "Active care episode identifier. In the demo session model this equals patient_uuid."
+            "description": "Active care episode identifier. In the demo recovery model this equals patient_uuid."
           },
           "chat_interaction_uuid": {
             "type": "string",

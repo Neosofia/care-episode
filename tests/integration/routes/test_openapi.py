@@ -13,25 +13,24 @@ def test_openapi_spec_contains_core_paths():
     assert spec["openapi"] == "3.0.3"
     assert spec["info"]["title"] == "Care Episode Service API"
     assert "/health" in spec["paths"]
-    assert "/api/v1/care-episodes/sessions" in spec["paths"]
-    assert "/api/v1/care-episodes/{patient_uuid}/clone-demo" in spec["paths"]
+    assert "/api/v1/care-episodes/recoveries" in spec["paths"]
     assert "/api/v1/care-episodes/{patient_uuid}/chat/interactions" in spec["paths"]
     assert (
         "/api/v1/care-episodes/{patient_uuid}/chat/interactions/{chat_interaction_uuid}/completions"
         in spec["paths"]
     )
     assert "/api/v1/care-episodes/{patient_uuid}/transcript" not in spec["paths"]
-    assert spec["info"]["version"] == "0.4.0"
+    assert spec["info"]["version"] == "0.6.0"
 
 
-def test_openapi_spec_defines_session_risk_level():
+def test_openapi_spec_defines_recovery_risk_level():
     root = Path(__file__).resolve().parents[3]
     spec = json.loads((root / "openapi.json").read_text())
 
-    session = spec["components"]["schemas"]["CareEpisodeSession"]
-    assert "risk_level" in session["required"]
-    assert session["properties"]["risk_level"]["enum"] == ["high", "medium", "low"]
-    assert "featured" not in session["properties"]
+    recovery = spec["components"]["schemas"]["CareEpisodeRecovery"]
+    assert "risk_level" in recovery["required"]
+    assert recovery["properties"]["risk_level"]["enum"] == ["high", "medium", "low"]
+    assert "featured" not in recovery["properties"]
 
 
 def test_openapi_spec_defines_chat_interaction_create_response():

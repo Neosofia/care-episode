@@ -31,7 +31,7 @@ os.environ["APP_DATABASE_URL"] = "postgresql+psycopg://app:dummy@localhost/dummy
 os.environ["MIGRATION_DATABASE_URL"] = "postgresql+psycopg://template:dummy@localhost/dummy"
 from src.app import create_app  # noqa: E402 — must import after env vars are set
 
-_TIER1_ACTORS = frozenset({"operator", "study", "clinician", "patient"})
+_TIER1_ACTORS = frozenset({"operator", "study", "clinician", "patient", "demo"})
 
 @pytest.fixture(scope="session")
 def rsa_keypair():

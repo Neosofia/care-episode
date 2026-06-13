@@ -1,9 +1,10 @@
 {
-  "tenant_uuid": "00000000-0000-7000-8000-000000000010",
+  "tenant_uuid": null,
+  "_tenant_uuid_note": "NOT USED by seed scripts. Tenant is resolved at seed time from SEED_BEARER_TOKEN or SEED_TENANT_UUID (cdp/scripts/seed_tenant.py). Each environment has its own platform tenant UUID.",
   "patients": [
     {
       "uuid": "00000000-0000-7000-8000-000000002847",
-      "display_code": "PAT-2847",
+      "display_code": "DEMO-123",
       "first_name": "Alice",
       "last_name": "Hartley",
       "email": "alice.hartley@demo.neosofia.tech",
@@ -11,7 +12,7 @@
       "clinical": {
         "surgery": "Laparoscopic cholecystectomy",
         "procedureDate": "2026-05-29",
-        "sessionId": "S-7291",
+        "recoveryId": "S-7291",
         "messageCount": 38,
         "risk_level": "high"
       }
@@ -26,7 +27,7 @@
       "clinical": {
         "surgery": "Inguinal hernia repair",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7288",
+        "recoveryId": "S-7288",
         "messageCount": 14,
         "risk_level": "low"
       }
@@ -41,7 +42,7 @@
       "clinical": {
         "surgery": "Partial knee meniscectomy",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7285",
+        "recoveryId": "S-7285",
         "messageCount": 22,
         "risk_level": "low"
       }
@@ -56,7 +57,7 @@
       "clinical": {
         "surgery": "Appendectomy",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7294",
+        "recoveryId": "S-7294",
         "messageCount": 9,
         "risk_level": "low"
       }
@@ -71,7 +72,7 @@
       "clinical": {
         "surgery": "Total thyroidectomy",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7301",
+        "recoveryId": "S-7301",
         "messageCount": 11,
         "risk_level": "low"
       }
@@ -86,7 +87,7 @@
       "clinical": {
         "surgery": "Cataract extraction",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7298",
+        "recoveryId": "S-7298",
         "messageCount": 6,
         "risk_level": "low"
       }
@@ -101,7 +102,7 @@
       "clinical": {
         "surgery": "Cesarean section",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7295",
+        "recoveryId": "S-7295",
         "messageCount": 16,
         "risk_level": "medium"
       }
@@ -116,7 +117,7 @@
       "clinical": {
         "surgery": "Rotator cuff repair",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7292",
+        "recoveryId": "S-7292",
         "messageCount": 19,
         "risk_level": "low"
       }
@@ -131,7 +132,7 @@
       "clinical": {
         "surgery": "Diagnostic hysteroscopy",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7289",
+        "recoveryId": "S-7289",
         "messageCount": 8,
         "risk_level": "medium"
       }
@@ -146,7 +147,7 @@
       "clinical": {
         "surgery": "Colonoscopy with polypectomy",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7286",
+        "recoveryId": "S-7286",
         "messageCount": 5,
         "risk_level": "medium"
       }
@@ -161,7 +162,7 @@
       "clinical": {
         "surgery": "Laparoscopic Nissen fundoplication",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7283",
+        "recoveryId": "S-7283",
         "messageCount": 13,
         "risk_level": "medium"
       }
@@ -176,7 +177,7 @@
       "clinical": {
         "surgery": "Total hip arthroplasty",
         "procedureDate": "2026-05-15",
-        "sessionId": "S-7280",
+        "recoveryId": "S-7280",
         "messageCount": 24,
         "risk_level": "low"
       }

@@ -56,7 +56,21 @@ Channel clients (CDP patient chat UI, future SMS/app adapters) open chat through
 
 Create uses a **care-episode service token** to Chat internally; completions forward the caller's patient JWT. Chat base URL is resolved from the authentication service registry (`slug: chat`). When Chat inference is unavailable, completions return **503** (passthrough); the patient UI shows an unavailable state — no stub replies.
 
-Interaction create returns `care_episode_uuid` (active episode identifier; in the demo session model this equals `patient_uuid`) and `chat_interaction_uuid`.
+Interaction create returns `care_episode_uuid` (active episode identifier; in the demo recovery model this equals `patient_uuid`) and `chat_interaction_uuid`.
+
+## Clinical risk evaluation
+
+After Chat persists a patient **content** turn, CE runs a dedicated risk agent (same OpenAI-compatible completions pattern as Chat inference). Skipped for `session_start`, empty content, and Chat **`intervention: true`** responses.
+
+| Setting | Purpose |
+|---------|---------|
+| `INFERENCE_COMPLETIONS_URL` | Completions endpoint (e.g. Bedrock gateway) |
+| `INFERENCE_API_KEY` | Bearer token for the gateway |
+| `INFERENCE_MODEL` | Model id for risk evaluation |
+| `INFERENCE_TEMPERATURE` | Default `0.2` |
+| `RISK_ESCALATION_ENABLED` | Default `true`; `high` outcomes POST to notification |
+
+When inference is unconfigured or unavailable, the completion still returns **200** from Chat; `risk_evaluation.risk_level` is `failed-pending-review` and recovery `risk_level` is unchanged. **`high`** is the only level that triggers escalation.
 
 ## Docker build and run
 
@@ -85,5 +99,5 @@ Shared JWT, JWKS, CORS, healthcheck, and PaaS networking guidance:
 ## Test matrix
 
 - `tests/unit/` — business logic and route handlers with isolated patching.
-- `tests/integration/` — OpenAPI contract, chat proxy happy path and no-session rejection (Chat HTTP stubbed).
+- `tests/integration/` — OpenAPI contract, chat proxy happy path and no-recovery rejection (Chat HTTP stubbed).
 - `tests/integration/test_container.py` — built image health against real Postgres.

@@ -1,5 +1,6 @@
 {
-  "tenant_uuid": "00000000-0000-7000-8000-000000000010",
+  "tenant_uuid": null,
+  "_tenant_uuid_note": "NOT USED by seed scripts. Tenant is resolved at seed time from SEED_BEARER_TOKEN or SEED_TENANT_UUID (cdp/scripts/seed_tenant.py). Each environment has its own platform tenant UUID.",
   "clinicians": [
     {
       "uuid": "00000000-0000-7000-8000-00000000c001",

@@ -8,8 +8,9 @@ from src.models.care_episode import (
     CareEpisodeAppointment,
     CareEpisodeInboxMessage,
     CareEpisodeRecord,
-    CareEpisodeSession,
+    CareEpisodeRecovery,
 )
+from src.models.risk import InteractionRiskState
 
 UTC = datetime.timezone.utc
 
@@ -19,24 +20,45 @@ def _default_last_activity(now: datetime.datetime | None = None) -> str:
     return instant.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def list_sessions(db, tenant_uuid: str | None = None) -> list[dict]:
-    days_post_op = (func.current_date() - CareEpisodeSession.procedure_date).label("days_post_op")
-    query = db.query(CareEpisodeSession, days_post_op)
+def _latest_risk_summaries_by_patient(db, patient_uuids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    if not patient_uuids:
+        return {}
+    rows = (
+        db.query(InteractionRiskState.patient_uuid, InteractionRiskState.summary)
+        .filter(
+            InteractionRiskState.patient_uuid.in_(patient_uuids),
+            InteractionRiskState.summary != "",
+        )
+        .order_by(
+            InteractionRiskState.patient_uuid.asc(),
+            InteractionRiskState.changed_at.desc(),
+        )
+        .distinct(InteractionRiskState.patient_uuid)
+        .all()
+    )
+    return {row.patient_uuid: row.summary for row in rows}
+
+
+def list_recoveries(db, tenant_uuid: str | None = None) -> list[dict]:
+    days_post_op = (func.current_date() - CareEpisodeRecovery.procedure_date).label("days_post_op")
+    query = db.query(CareEpisodeRecovery, days_post_op)
     if tenant_uuid:
-        query = query.filter(CareEpisodeSession.tenant_uuid == uuid.UUID(str(tenant_uuid)))
-    rows = query.order_by(CareEpisodeSession.display_name.asc()).all()
+        query = query.filter(CareEpisodeRecovery.tenant_uuid == uuid.UUID(str(tenant_uuid)))
+    rows = query.order_by(CareEpisodeRecovery.display_name.asc()).all()
+    summaries = _latest_risk_summaries_by_patient(db, [recovery.patient_uuid for recovery, _ in rows])
     return [
         {
-            "patient_uuid": str(session.patient_uuid),
-            "display_code": session.display_code,
-            "display_name": session.display_name,
-            "surgery": session.surgery,
-            "procedure_date": session.procedure_date.isoformat(),
+            "patient_uuid": str(recovery.patient_uuid),
+            "display_code": recovery.display_code,
+            "display_name": recovery.display_name,
+            "surgery": recovery.surgery,
+            "procedure_date": recovery.procedure_date.isoformat(),
             "days_post_op": int(days),
-            "session_id": session.session_id,
-            "risk_level": session.risk_level or "low",
+            "recovery_id": recovery.recovery_id,
+            "risk_level": recovery.risk_level or "low",
+            "risk_summary": summaries.get(recovery.patient_uuid, ""),
         }
-        for session, days in rows
+        for recovery, days in rows
     ]
 
 
@@ -70,11 +92,11 @@ def create_episode_invite(payload: dict) -> dict:
     }
 
 
-def upsert_session(db, payload: dict, *, changed_by_uuid: str, changed_by_type: int = 2) -> dict:
+def upsert_recovery(db, payload: dict, *, changed_by_uuid: str, changed_by_type: int = 2) -> dict:
     patient_uuid = uuid.UUID(str(payload["patient_uuid"]))
-    row = db.get(CareEpisodeSession, patient_uuid)
+    row = db.get(CareEpisodeRecovery, patient_uuid)
     if row is None:
-        row = CareEpisodeSession(
+        row = CareEpisodeRecovery(
             patient_uuid=patient_uuid,
             changed_by_uuid=uuid.UUID(str(changed_by_uuid)),
             changed_by_type=changed_by_type,
@@ -85,7 +107,7 @@ def upsert_session(db, payload: dict, *, changed_by_uuid: str, changed_by_type: 
     row.display_name = str(payload["display_name"])
     row.surgery = str(payload["surgery"])
     row.procedure_date = datetime.date.fromisoformat(str(payload["procedure_date"]))
-    row.session_id = str(payload["session_id"])
+    row.recovery_id = str(payload["recovery_id"])
     last_activity = payload.get("last_activity")
     row.last_activity = (
         str(last_activity).strip()
@@ -106,7 +128,7 @@ def upsert_session(db, payload: dict, *, changed_by_uuid: str, changed_by_type: 
         "surgery": row.surgery,
         "procedure_date": row.procedure_date.isoformat(),
         "days_post_op": (datetime.date.today() - row.procedure_date).days,
-        "session_id": row.session_id,
+        "recovery_id": row.recovery_id,
         "risk_level": row.risk_level,
     }
 

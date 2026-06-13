@@ -11,15 +11,15 @@ from src.db.base import Base
 from src.models.audit_mixin import AuditColumnsMixin
 
 
-class CareEpisodeSession(Base, AuditColumnsMixin):
-    __tablename__ = "care_episode_sessions"
+class CareEpisodeRecovery(Base, AuditColumnsMixin):
+    __tablename__ = "care_episode_recoveries"
 
     patient_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     display_code: Mapped[str] = mapped_column(String(32), nullable=False)
     display_name: Mapped[str] = mapped_column(String(128), nullable=False)
     surgery: Mapped[str] = mapped_column(String(255), nullable=False)
     procedure_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
-    session_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    recovery_id: Mapped[str] = mapped_column(String(64), nullable=False)
     last_activity: Mapped[str] = mapped_column(String(64), nullable=False)
     risk_level: Mapped[str] = mapped_column(String(16), nullable=False, default="low")
     tenant_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)

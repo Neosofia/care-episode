@@ -48,6 +48,20 @@ class Settings(BaseSettings):
     # Chat service proxy (patient write path; base URL resolved via auth service registry)
     chat_service_timeout_seconds: float = Field(default=90.0, gt=0)
 
+    # Clinical risk inference (Bedrock/OpenAI-compatible completions API)
+    inference_completions_url: str = ""
+    inference_api_key: str | None = None
+    inference_model: str = ""
+    inference_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    risk_escalation_enabled: bool = True
+    notification_service_timeout_seconds: float = Field(default=15.0, gt=0)
+
+    # Demo template patient (DEMO-123); exposed on principal as demoTemplatePatientUuid for Cedar.
+    demo_template_patient_uuid: str = Field(
+        default="00000000-0000-7000-8000-000000002847",
+        min_length=36,
+    )
+
     # Service-to-service auth and registry discovery
     authentication_service_base_url: str = ""
     care_episode_client_secret: str = ""

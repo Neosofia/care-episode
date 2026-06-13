@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from src.bootstrap.config import settings
 from src.db.base import Base
 import src.models.care_episode  # noqa: F401
+import src.models.risk  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
