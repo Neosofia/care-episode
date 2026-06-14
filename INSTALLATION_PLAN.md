@@ -1,3 +1,23 @@
+# Installation Plan — care-episode v0.7.0
+
+Per-version deploy and verification steps for operators.
+
+## Deploy steps
+
+1. Pull image `ghcr.io/neosofia/care-episode:v0.7.0` (tag `care-episode/v0.7.0`).
+2. No new migrations or env vars (SDK **`authorization-in-the-middle/v0.7.1`** only).
+
+## Post-deploy verification
+
+1. `GET /health` returns `"status": "ok"` and `"version": "0.7.0"`.
+2. Chat proxy interaction create and completion proxy smoke checks pass.
+
+## Evidence
+
+- Health version **0.7.0**; structured logs show successful chat proxy outcomes.
+
+---
+
 # Installation Plan — care-episode v0.6.0
 
 Per-version deploy and verification steps for operators.

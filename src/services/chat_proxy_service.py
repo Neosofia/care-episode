@@ -3,14 +3,25 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from authorization_in_the_middle.flask_identity import jwt_claim_principal_attributes
+from flask import g, has_request_context
 from werkzeug.exceptions import NotFound
 
-from src.authorization.entities import principal_tenant_uuid
 from src.clients import chat_client
 from src.models.care_episode import CareEpisodeRecovery
 from src.services.care_episode_service import _default_last_activity
 from src.services.chat_context import build_interaction_context
 from src.services.risk_evaluation_service import update_risk_after_patient_chat_message
+
+
+def _jwt_tenant_uuid() -> str:
+    if not has_request_context():
+        return ""
+    claims = getattr(g, "jwt_claims", None) or {}
+    if not claims:
+        return ""
+    _, _, attrs = jwt_claim_principal_attributes(claims)
+    return str(attrs.get("tenantId") or "").strip()
 
 
 def require_recovery(db, patient_uuid: str) -> CareEpisodeRecovery:
@@ -23,7 +34,7 @@ def require_recovery(db, patient_uuid: str) -> CareEpisodeRecovery:
 
 def create_chat_interaction(db, patient_uuid: str) -> dict[str, Any]:
     recovery = require_recovery(db, patient_uuid)
-    context = build_interaction_context(recovery, tenant_uuid=principal_tenant_uuid())
+    context = build_interaction_context(recovery, tenant_uuid=_jwt_tenant_uuid())
     interaction = chat_client.create_interaction(patient_uuid, context=context)
     return {**interaction, "care_episode_uuid": patient_uuid}
 
@@ -52,7 +63,7 @@ def _maybe_evaluate_risk(
         chat_interaction_uuid=chat_interaction_uuid,
         message_uuid=str(message_uuid),
         patient_message=content,
-        tenant_uuid=principal_tenant_uuid(),
+        tenant_uuid=_jwt_tenant_uuid(),
     )
 
 

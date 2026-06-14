@@ -31,12 +31,7 @@ def _user(entity_id: str, **flags: bool) -> dict:
 
 
 def _episode(patient_uuid: str) -> dict:
-    patient_uuid = str(patient_uuid).strip()
-    return build_entity_payload(
-        f"{entities.NAMESPACE}::CareEpisode",
-        patient_uuid,
-        {"patientUuid": patient_uuid},
-    )
+    return entities.build_care_episode_entity(patient_uuid)
 
 
 def _authorized(

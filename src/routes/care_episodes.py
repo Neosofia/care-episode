@@ -6,7 +6,6 @@ from authorization_in_the_middle.security import with_security
 from flask import Blueprint, Response, jsonify, request
 from werkzeug.exceptions import BadGateway, BadRequest, NotFound
 
-from src.authorization import entities as auth_entities
 from src.bootstrap.config import settings
 from src.bootstrap.request_telemetry import log_request_handled
 from src.db.engine import SessionLocal
@@ -26,33 +25,8 @@ from src.services.chat_proxy_service import create_chat_interaction, proxy_chat_
 
 bp = Blueprint("care-episodes", __name__, url_prefix="/api/v1/care-episodes")
 
-_MEMBER_LIST = dict(
-    action='Action::"care-episode:list"',
-    resource_fn=auth_entities.care_episode_member_resource_uid,
-    entities_fn=auth_entities.care_episode_member_entities,
-    id_arg="patient_uuid",
-)
-_MEMBER_CREATE = dict(
-    action='Action::"care-episode:create"',
-    resource_fn=auth_entities.care_episode_member_resource_uid,
-    entities_fn=auth_entities.care_episode_member_entities,
-    id_arg="patient_uuid",
-)
-_CATALOG_LIST = dict(
-    action='Action::"care-episode:list"',
-    resource_fn=auth_entities.care_episode_catalog_resource_uid,
-    entities_fn=auth_entities.care_episode_catalog_entities,
-)
-_CATALOG_CREATE = dict(
-    action='Action::"care-episode:create"',
-    resource_fn=auth_entities.care_episode_catalog_resource_uid,
-    entities_fn=auth_entities.care_episode_catalog_entities,
-)
-_RECOVERY_CREATE = dict(
-    action='Action::"care-episode:create"',
-    resource_fn=auth_entities.recovery_create_resource_uid,
-    entities_fn=auth_entities.recovery_create_entities,
-)
+_MEMBER_LIST = dict(action='Action::"care-episode:list"', id_arg="patient_uuid")
+_MEMBER_CREATE = dict(action='Action::"care-episode:create"', id_arg="patient_uuid")
 
 
 def init_care_episode_routes(app, cedar_evaluator):
@@ -61,7 +35,7 @@ def init_care_episode_routes(app, cedar_evaluator):
 
 
 @bp.get("/recoveries")
-@with_security(rate_limit=settings.care_episode_read_rate_limit, **_CATALOG_LIST)
+@with_security(rate_limit=settings.care_episode_read_rate_limit)
 def get_recoveries() -> Response:
     tenant_uuid = request.args.get("tenant_uuid")
     with SessionLocal() as db:
@@ -140,7 +114,10 @@ def post_messages(patient_uuid: str) -> Response:
 
 
 @bp.post("/invites")
-@with_security(rate_limit=settings.care_episode_write_rate_limit, **_CATALOG_CREATE)
+@with_security(
+    action='Action::"care-episode:create"',
+    rate_limit=settings.care_episode_write_rate_limit,
+)
 def post_invite() -> Response:
     payload = request.get_json(silent=True) or {}
     required = ("patient_uuid", "procedure_type", "care_window_days")
@@ -152,7 +129,10 @@ def post_invite() -> Response:
 
 
 @bp.post("/recoveries")
-@with_security(rate_limit=settings.care_episode_write_rate_limit, **_RECOVERY_CREATE)
+@with_security(
+    action='Action::"care-episode:create"',
+    rate_limit=settings.care_episode_write_rate_limit,
+)
 def post_recovery() -> Response:
     payload = request.get_json(silent=True) or {}
     required = (

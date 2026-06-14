@@ -2,6 +2,12 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.7.0] - 2026-06-14
+
+### Changed
+
+- Pinned **`authorization-in-the-middle/v0.7.1`** — SDK REST inference on care-episode routes; principals via `resolve_jwt_principal` with demo template patient attr.
+
 ## [0.6.0] - 2026-06-11
 
 ### Added
