@@ -2,6 +2,12 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.7.1] - 2026-06-16
+
+### Fixed
+
+- **`POST /api/v1/care-episodes/recoveries`** uses member-scoped Cedar entities from the request `patient_uuid`, so demo bootstrap can create a personal recovery for the signed-in user without operator catalog scope.
+
 ## [0.7.0] - 2026-06-14
 
 ### Changed

@@ -1,3 +1,23 @@
+# Installation Plan — care-episode v0.7.1
+
+Per-version deploy and verification steps for operators.
+
+## Deploy steps
+
+1. Pull image `ghcr.io/neosofia/care-episode:v0.7.1` (tag `care-episode/v0.7.1`).
+2. No new migrations or env vars.
+
+## Post-deploy verification
+
+1. `GET /health` returns `"status": "ok"` and `"version": "0.7.1"`.
+2. Demo workspace bootstrap completes `POST /api/v1/care-episodes/recoveries` for the signed-in demo user (201, not 403).
+
+## Evidence
+
+- Health version **0.7.1**; demo bootstrap recovery create succeeds on staging.
+
+---
+
 # Installation Plan — care-episode v0.7.0
 
 Per-version deploy and verification steps for operators.

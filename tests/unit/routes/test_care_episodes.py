@@ -87,6 +87,53 @@ def test_patch_message_read_not_found(mock_session, mock_mark, client, rsa_keypa
     assert response.status_code == 404
 
 
+def _recovery_payload(*, patient_uuid: str = SUB) -> dict:
+    return {
+        "patient_uuid": patient_uuid,
+        "tenant_uuid": TENANT,
+        "display_code": "DEMO-001",
+        "display_name": "Demo Recovery",
+        "surgery": "Knee arthroscopy",
+        "procedure_date": "2026-01-15",
+        "recovery_id": "recovery-demo-001",
+        "risk_level": "low",
+    }
+
+
+@patch("src.routes.care_episodes.upsert_recovery", return_value={"patient_uuid": SUB})
+@patch("src.routes.care_episodes.SessionLocal")
+def test_post_recovery_allows_demo_self(mock_session, mock_upsert, client, rsa_keypair):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    response = client.post(
+        "/api/v1/care-episodes/recoveries",
+        json=_recovery_payload(patient_uuid=SUB),
+        headers={
+            **_auth_headers(rsa_keypair, actors=["demo"], sub=SUB),
+            "X-Active-Actor": "demo",
+        },
+        base_url="https://localhost",
+    )
+    assert response.status_code == 201
+    mock_upsert.assert_called_once()
+
+
+@patch("src.routes.care_episodes.upsert_recovery")
+@patch("src.routes.care_episodes.SessionLocal")
+def test_post_recovery_forbidden_for_demo_other_patient(mock_session, mock_upsert, client, rsa_keypair):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    response = client.post(
+        "/api/v1/care-episodes/recoveries",
+        json=_recovery_payload(patient_uuid=PATIENT),
+        headers={
+            **_auth_headers(rsa_keypair, actors=["demo"], sub=SUB),
+            "X-Active-Actor": "demo",
+        },
+        base_url="https://localhost",
+    )
+    assert response.status_code == 403
+    mock_upsert.assert_not_called()
+
+
 def test_study_actor_forbidden_on_patient_write(client, rsa_keypair):
     response = client.post(
         f"/api/v1/care-episodes/{PATIENT}/appointments",

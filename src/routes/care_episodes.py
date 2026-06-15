@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import datetime
+from typing import Any
 
+from authorization_in_the_middle.rest_entities import _entities_for_write_member, _resource_uid_for_write_member
 from authorization_in_the_middle.security import with_security
+from authorization_in_the_middle.service_conventions import _import_entities_module
 from flask import Blueprint, Response, jsonify, request
 from werkzeug.exceptions import BadGateway, BadRequest, NotFound
 
+from src.authorization import entities as auth_entities
 from src.bootstrap.config import settings
 from src.bootstrap.request_telemetry import log_request_handled
 from src.db.engine import SessionLocal
@@ -27,6 +31,29 @@ bp = Blueprint("care-episodes", __name__, url_prefix="/api/v1/care-episodes")
 
 _MEMBER_LIST = dict(action='Action::"care-episode:list"', id_arg="patient_uuid")
 _MEMBER_CREATE = dict(action='Action::"care-episode:create"', id_arg="patient_uuid")
+
+
+def _recovery_write_record() -> dict[str, Any]:
+    payload = request.get_json(silent=True)
+    return dict(payload) if isinstance(payload, dict) else {}
+
+
+def _recovery_write_entities() -> list[dict[str, Any]]:
+    return _entities_for_write_member(
+        _import_entities_module(),
+        "care_episode",
+        _recovery_write_record(),
+        namespace=auth_entities.NAMESPACE,
+    )
+
+
+def _recovery_write_resource_uid() -> str:
+    return _resource_uid_for_write_member(
+        _import_entities_module(),
+        "care_episode",
+        _recovery_write_record(),
+        namespace=auth_entities.NAMESPACE,
+    )
 
 
 def init_care_episode_routes(app, cedar_evaluator):
@@ -131,6 +158,8 @@ def post_invite() -> Response:
 @bp.post("/recoveries")
 @with_security(
     action='Action::"care-episode:create"',
+    resource_fn=_recovery_write_resource_uid,
+    entities_fn=_recovery_write_entities,
     rate_limit=settings.care_episode_write_rate_limit,
 )
 def post_recovery() -> Response:
