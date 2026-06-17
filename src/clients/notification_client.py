@@ -10,42 +10,33 @@ from src.clients.mesh_client import resolve_service_base_url
 NOTIFICATION_SERVICE_SLUG = "notification"
 
 
+def _patient_record_url(*, patient_uuid: str, episode_uuid: str) -> str:
+    base = settings.frontend_url.rstrip("/")
+    return f"{base}/clinician/patients/{patient_uuid}?episode_uuid={episode_uuid}"
+
+
 def submit_clinical_escalation(
     *,
-    patient_display_code: str,
-    patient_display_name: str,
-    procedure_name: str,
-    days_post_op: int,
-    care_summary: str,
     patient_uuid: str,
+    episode_uuid: str,
     tenant_uuid: str,
     chat_interaction_uuid: str,
     message_uuid: str,
 ) -> None:
-    """Relay a high-risk patient turn to the Neosofia inbox via notification email relay."""
+    """Relay a high-risk alert with a deep link only — no PHI/PII in email body."""
     try:
         base = resolve_service_base_url(NOTIFICATION_SERVICE_SLUG).rstrip("/")
     except Exception as exc:
         raise BadGateway("notification service is not available") from exc
 
-    patient_line = patient_display_code
-    if patient_display_name.strip():
-        patient_line = f"{patient_display_code} ({patient_display_name.strip()})"
-
+    record_url = _patient_record_url(patient_uuid=patient_uuid, episode_uuid=episode_uuid)
     payload = {
         "from_email": settings.clinical_risk_alert_from_email,
-        "subject": f"Clinical risk alert — {patient_display_code}",
+        "subject": "Clinical risk alert",
         "message": (
-            "Care Episode detected high clinical risk on a patient chat message.\n\n"
-            f"Patient: {patient_line}\n"
-            f"Procedure: {procedure_name.strip()} (day {days_post_op} post-op)\n\n"
-            "Care summary:\n"
-            f"{care_summary.strip()}\n\n"
-            "Reference:\n"
-            f"Patient UUID: {patient_uuid}\n"
-            f"Tenant UUID: {tenant_uuid}\n"
-            f"Chat interaction UUID: {chat_interaction_uuid}\n"
-            f"Message UUID: {message_uuid}\n"
+            "A patient chat message was flagged as high clinical risk.\n\n"
+            "Open the patient record in Neosofia:\n"
+            f"{record_url}\n"
         ),
     }
 

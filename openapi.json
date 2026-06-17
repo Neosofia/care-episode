@@ -921,7 +921,7 @@
       "post": {
         "operationId": "createPatientChatInteraction",
         "summary": "Create a patient chat interaction",
-        "description": "Validates an active care episode recovery, builds authoritative interaction context server-side, and creates a chat interaction via service-to-service call. Does not call Chat when no recovery exists.",
+        "description": "Validates an active care episode recovery, merges optional client-supplied patient_display_name into interaction context, and creates a chat interaction via service-to-service call. Does not call Chat when no recovery exists.",
         "parameters": [
           {
             "name": "patient_uuid",
@@ -933,6 +933,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChatInteractionRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "Chat interaction created",
@@ -1757,6 +1767,20 @@
           "channel": {
             "type": "integer",
             "description": "Chat channel enum value forwarded to Chat."
+          },
+          "patient_display_name": {
+            "type": "string",
+            "description": "Optional greeting name supplied by the client for chat context and risk evaluation."
+          }
+        }
+      },
+      "CreateChatInteractionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "patient_display_name": {
+            "type": "string",
+            "description": "Optional patient greeting name for the care assistant."
           }
         }
       },

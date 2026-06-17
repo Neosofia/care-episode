@@ -1,3 +1,27 @@
+# Installation Plan — care-episode v0.8.2
+
+Per-version deploy and verification steps for operators.
+
+## Deploy steps
+
+1. Pull image `ghcr.io/neosofia/care-episode:v0.8.2` (tag `care-episode/v0.8.2`).
+2. No new migrations (head remains revision **`012`**).
+3. Set **`FRONTEND_URL`** to the CDP UI base URL (used for clinical risk alert deep links).
+4. Redeploy **CDP UI 2026.06.20** (or later) in the same change window — UI sends optional `patient_display_name` for chat greeting and reads `episode_uuid` from escalation deep links.
+
+## Post-deploy verification
+
+1. `GET /health` returns `"status": "ok"` and `"version": "0.8.2"`.
+2. `SELECT version_num FROM alembic_version` reports **`012`**.
+3. High-risk chat completion triggers a clinical alert email whose body contains only a deep link (`/clinician/patients/{patient_uuid}?episode_uuid={episode_uuid}`) — no patient names or message content.
+4. Patient chat greeting uses `patient_display_name` from the client when supplied.
+
+## Evidence
+
+- Health version **0.8.2**; migration **012** unchanged; staging E2E green.
+
+---
+
 # Installation Plan — care-episode v0.8.1
 
 Per-version deploy and verification steps for operators.

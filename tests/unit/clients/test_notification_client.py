@@ -9,6 +9,7 @@ from src.clients import notification_client
 pytestmark = pytest.mark.unit
 
 PATIENT = "00000000-0000-7000-8000-000000000001"
+EPISODE = "00000000-0000-7000-8000-000000000099"
 INTERACTION = "00000000-0000-7000-8000-000000000002"
 TENANT = "00000000-0000-7000-8000-000000000010"
 MESSAGE = "00000000-0000-7000-8000-000000000003"
@@ -16,12 +17,8 @@ MESSAGE = "00000000-0000-7000-8000-000000000003"
 
 def _submit(**overrides):
     payload = {
-        "patient_display_code": "PT-001",
-        "patient_display_name": "Alex Patient",
-        "procedure_name": "Knee scope",
-        "days_post_op": 5,
-        "care_summary": "Patient reports crushing chest pain on day 2 post-op.",
         "patient_uuid": PATIENT,
+        "episode_uuid": EPISODE,
         "tenant_uuid": TENANT,
         "chat_interaction_uuid": INTERACTION,
         "message_uuid": MESSAGE,
@@ -37,9 +34,12 @@ def test_submit_clinical_escalation_requires_registry_lookup(mock_resolve):
         _submit()
 
 
+@patch("src.clients.notification_client.settings")
 @patch("src.clients.notification_client.resolve_service_base_url", return_value="http://notification:8016")
 @patch("src.clients.notification_client.httpx.post")
-def test_submit_clinical_escalation_posts_email_alert(mock_post, _mock_resolve):
+def test_submit_clinical_escalation_posts_deep_link_only(mock_post, _mock_resolve, mock_settings):
+    mock_settings.clinical_risk_alert_from_email = "care-episode-alerts@neosofia.tech"
+    mock_settings.frontend_url = "https://staging.neosofia.tech"
     response = MagicMock()
     response.is_success = True
     mock_post.return_value = response
@@ -49,14 +49,16 @@ def test_submit_clinical_escalation_posts_email_alert(mock_post, _mock_resolve):
     mock_post.assert_called_once()
     call = mock_post.call_args
     assert call.args[0] == "http://notification:8016/api/emails"
-    assert call.kwargs["headers"] == {"Content-Type": "application/json"}
     body = call.kwargs["json"]
     assert body["from_email"] == "care-episode-alerts@neosofia.tech"
-    assert body["subject"] == "Clinical risk alert — PT-001"
-    assert "PT-001 (Alex Patient)" in body["message"]
-    assert "Knee scope (day 5 post-op)" in body["message"]
-    assert "Patient reports crushing chest pain" in body["message"]
-    assert PATIENT in body["message"]
+    assert body["subject"] == "Clinical risk alert"
+    assert "crushing chest pain" not in body["message"]
+    assert (
+        body["message"]
+        == "A patient chat message was flagged as high clinical risk.\n\n"
+        "Open the patient record in Neosofia:\n"
+        f"https://staging.neosofia.tech/clinician/patients/{PATIENT}?episode_uuid={EPISODE}\n"
+    )
 
 
 @patch("src.clients.notification_client.resolve_service_base_url", return_value="http://notification:8016")

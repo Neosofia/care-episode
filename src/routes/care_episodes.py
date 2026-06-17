@@ -376,9 +376,10 @@ def post_care_episode() -> Response:
 @bp.post("/<patient_uuid>/chat/interactions")
 @with_security(rate_limit=settings.care_episode_write_rate_limit, **_MEMBER_CREATE)
 def post_chat_interaction(patient_uuid: str) -> Response:
+    payload = request.get_json(silent=True) or {}
     try:
         with SessionLocal() as db:
-            item = create_chat_interaction(db, patient_uuid)
+            item = create_chat_interaction(db, patient_uuid, payload)
     except NotFound:
         log_request_handled("chat_interaction_create", 404, outcome="no_episode")
         raise

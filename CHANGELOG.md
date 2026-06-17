@@ -2,6 +2,17 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.8.2] - 2026-06-20
+
+### Changed
+
+- **Clinical risk alert email** — escalation notifications contain a deep link to the clinician patient record only (`patient_uuid` + `episode_uuid` query param). No PHI/PII in subject or body.
+- **Chat interaction context** — optional `patient_display_name` on create-interaction and completion proxy requests; merged into interaction context for greeting. User service label lookup removed.
+
+### Removed
+
+- **`user_client`** — care-episode no longer calls User to resolve patient display names.
+
 ## [0.8.1] - 2026-06-19
 
 ### Changed

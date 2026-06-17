@@ -7,7 +7,7 @@ from authorization_in_the_middle.flask_identity import jwt_claim_principal_attri
 from flask import g, has_request_context
 from werkzeug.exceptions import Conflict, NotFound
 
-from src.clients import chat_client, user_client
+from src.clients import chat_client
 from src.models.care_episode import EPISODE_STATUS_ACTIVE, CareEpisode
 from src.services.care_episode_service import (
     _default_last_activity,
@@ -27,6 +27,13 @@ def _jwt_tenant_uuid() -> str:
     return str(attrs.get("tenantId") or "").strip()
 
 
+def _patient_display_name(payload: dict[str, Any] | None) -> str | None:
+    if not payload:
+        return None
+    name = str(payload.get("patient_display_name") or "").strip()
+    return name or None
+
+
 def require_episode(db, patient_uuid: str) -> CareEpisode:
     episode = get_active_episode(db, patient_uuid)
     if episode is None:
@@ -41,13 +48,16 @@ def require_active_episode(db, patient_uuid: str) -> CareEpisode:
     return episode
 
 
-def create_chat_interaction(db, patient_uuid: str) -> dict[str, Any]:
+def create_chat_interaction(
+    db,
+    patient_uuid: str,
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     episode = require_active_episode(db, patient_uuid)
-    patient_profile = user_client.get_user_profile(patient_uuid)
     context = build_interaction_context(
         episode,
         tenant_uuid=_jwt_tenant_uuid(),
-        patient_profile=patient_profile,
+        patient_display_name=_patient_display_name(payload),
     )
     interaction = chat_client.create_interaction(patient_uuid, context=context)
     return {**interaction, "care_episode_uuid": str(episode.episode_uuid)}
@@ -78,6 +88,7 @@ def _maybe_evaluate_risk(
         message_uuid=str(message_uuid),
         patient_message=content,
         tenant_uuid=_jwt_tenant_uuid(),
+        patient_display_name=_patient_display_name(payload),
     )
 
 

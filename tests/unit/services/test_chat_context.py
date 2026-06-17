@@ -9,7 +9,7 @@ from src.services.chat_context import build_interaction_context, days_post_op_fo
 pytestmark = pytest.mark.unit
 
 PATIENT = uuid.UUID("00000000-0000-7000-8000-000000000001")
-PATIENT_PROFILE = {"display_code": "PT-001", "display_name": "Alex Patient"}
+PATIENT_PROFILE = "Alex Patient"
 
 
 def _episode(**overrides) -> CareEpisode:
@@ -32,7 +32,7 @@ def _episode(**overrides) -> CareEpisode:
 
 def test_build_interaction_context_from_episode():
     episode = _episode()
-    context = build_interaction_context(episode, patient_profile=PATIENT_PROFILE)
+    context = build_interaction_context(episode, patient_display_name=PATIENT_PROFILE)
     assert context["patient_display_name"] == "Alex Patient"
     assert context["patient_first_name"] == "Alex"
     assert context["procedure_name"] == "Knee scope"
@@ -48,12 +48,12 @@ def test_build_interaction_context_prefers_jwt_tenant():
     context = build_interaction_context(
         episode,
         tenant_uuid=jwt_tenant,
-        patient_profile=PATIENT_PROFILE,
+        patient_display_name=PATIENT_PROFILE,
     )
     assert context["tenant_uuid"] == jwt_tenant
 
 
 def test_build_interaction_context_omits_invalid_risk():
     episode = _episode(risk_level="unknown")
-    context = build_interaction_context(episode, patient_profile=PATIENT_PROFILE)
+    context = build_interaction_context(episode, patient_display_name=PATIENT_PROFILE)
     assert "risk_level" not in context

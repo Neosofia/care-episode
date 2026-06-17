@@ -40,34 +40,30 @@ def test_require_episode_not_found(_mock_active):
         require_episode(db, PATIENT)
 
 
-@patch(
-    "src.services.chat_proxy_service.user_client.get_user_profile",
-    return_value={"display_code": "PT-001", "display_name": "Alex Patient"},
-)
 @patch("src.services.chat_proxy_service.get_active_episode")
 @patch("src.services.chat_proxy_service.chat_client.create_interaction")
-def test_create_chat_interaction(mock_create, mock_active, _mock_user):
+def test_create_chat_interaction(mock_create, mock_active):
     episode = _episode_row()
     db = MagicMock()
     mock_active.return_value = episode
     mock_create.return_value = {"chat_interaction_uuid": INTERACTION, "user_uuid": PATIENT}
-    result = create_chat_interaction(db, PATIENT)
+    result = create_chat_interaction(
+        db,
+        PATIENT,
+        {"patient_display_name": "Alex Patient"},
+    )
     assert result["chat_interaction_uuid"] == INTERACTION
     assert result["care_episode_uuid"] == EPISODE
     mock_create.assert_called_once()
-    args, kwargs = mock_create.call_args
-    assert args[0] == PATIENT
+    kwargs = mock_create.call_args.kwargs
     assert kwargs["context"]["procedure_name"] == "Knee scope"
+    assert kwargs["context"]["patient_display_name"] == "Alex Patient"
     assert kwargs["context"]["tenant_uuid"] == str(episode.tenant_uuid)
 
 
-@patch(
-    "src.services.chat_proxy_service.user_client.get_user_profile",
-    return_value={"display_code": "PT-001", "display_name": "Alex Patient"},
-)
 @patch("src.services.chat_proxy_service.get_active_episode")
 @patch("src.services.chat_proxy_service.chat_client.create_interaction")
-def test_create_chat_interaction_prefers_jwt_tenant(mock_create, mock_active, _mock_user):
+def test_create_chat_interaction_prefers_jwt_tenant(mock_create, mock_active):
     app = Flask(__name__)
     jwt_tenant = "00000000-0000-7000-8000-000000000099"
     db = MagicMock()
@@ -78,7 +74,7 @@ def test_create_chat_interaction_prefers_jwt_tenant(mock_create, mock_active, _m
             "sub": PATIENT,
             "neosofia:tenant_uuid": jwt_tenant,
         }
-        create_chat_interaction(db, PATIENT)
+        create_chat_interaction(db, PATIENT, {"patient_display_name": "Alex Patient"})
     assert mock_create.call_args.kwargs["context"]["tenant_uuid"] == jwt_tenant
 
 
@@ -98,12 +94,12 @@ def test_proxy_chat_completion_updates_last_activity(mock_create, mock_evaluate,
         db,
         PATIENT,
         INTERACTION,
-        {"content": "Hi"},
+        {"content": "Hi", "patient_display_name": "Alex Patient"},
     )
     assert result["message"] == "hello"
     assert result["risk_evaluation"]["risk_level"] == "low"
-    mock_create.assert_called_once_with(PATIENT, INTERACTION, {"content": "Hi"})
     mock_evaluate.assert_called_once()
+    assert mock_evaluate.call_args.kwargs["patient_display_name"] == "Alex Patient"
     assert episode.last_activity
     db.commit.assert_called_once()
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "care-episode"
-version = "0.8.1"
+version = "0.8.2"
 description = "Neosofia Care Episode Service."
 requires-python = ">=3.14"
 dependencies = [

@@ -47,10 +47,6 @@ def _episode_row():
     )
 
 
-@patch(
-    "src.services.chat_proxy_service.user_client.get_user_profile",
-    return_value={"display_code": "PT-001", "display_name": "Alex Patient"},
-)
 @patch("src.clients.chat_client.create_interaction")
 @patch("src.services.chat_proxy_service.get_active_episode")
 @patch("src.routes.care_episodes.SessionLocal")
@@ -58,7 +54,6 @@ def test_chat_interaction_create_happy_path(
     mock_session,
     mock_active_episode,
     mock_create_interaction,
-    _mock_user_profile,
     client,
     rsa_keypair,
     api_spec,
@@ -77,7 +72,12 @@ def test_chat_interaction_create_happy_path(
     }
 
     endpoint = f"/api/v1/care-episodes/{PATIENT}/chat/interactions"
-    response = client.post(endpoint, headers=_auth_headers(rsa_keypair, sub=PATIENT), base_url="https://localhost")
+    response = client.post(
+        endpoint,
+        headers=_auth_headers(rsa_keypair, sub=PATIENT),
+        json={"patient_display_name": "Alex Patient"},
+        base_url="https://localhost",
+    )
 
     assert response.status_code == 201
     body = response.get_json()
