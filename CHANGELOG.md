@@ -2,6 +2,16 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.8.1] - 2026-06-19
+
+### Changed
+
+- **Patient identity from User registry** — `display_code` and `display_name` are no longer stored on `care_episode_recoveries` or returned on episode API payloads. Episodes store `patient_uuid` only; chat context and clinical escalation resolve labels from the User service at runtime.
+
+### Removed
+
+- **`display_code` / `display_name`** on `CareEpisode`, upsert/start request bodies, and episode history entries (migration **012**).
+
 ## [0.8.0] - 2026-06-18
 
 ### Added

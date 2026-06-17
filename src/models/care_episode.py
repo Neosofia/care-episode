@@ -19,8 +19,6 @@ class CareEpisode(Base, AuditColumnsMixin):
 
     episode_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     patient_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
-    display_code: Mapped[str] = mapped_column(String(32), nullable=False)
-    display_name: Mapped[str] = mapped_column(String(128), nullable=False)
     surgery: Mapped[str] = mapped_column(String(255), nullable=False)
     procedure_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     recovery_id: Mapped[str] = mapped_column(String(64), nullable=False)

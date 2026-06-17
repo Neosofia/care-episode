@@ -35,8 +35,6 @@ def _episode_row():
     return CareEpisode(
         episode_uuid=uuid.UUID("00000000-0000-7000-8000-000000000099"),
         patient_uuid=uuid.UUID(PATIENT),
-        display_code="PT-001",
-        display_name="Alex Patient",
         surgery="Knee scope",
         procedure_date=datetime.date.today(),
         recovery_id="sess-1",
@@ -49,10 +47,23 @@ def _episode_row():
     )
 
 
+@patch(
+    "src.services.chat_proxy_service.user_client.get_user_profile",
+    return_value={"display_code": "PT-001", "display_name": "Alex Patient"},
+)
 @patch("src.clients.chat_client.create_interaction")
 @patch("src.services.chat_proxy_service.get_active_episode")
 @patch("src.routes.care_episodes.SessionLocal")
-def test_chat_interaction_create_happy_path(mock_session, mock_active_episode, mock_create_interaction, client, rsa_keypair, api_spec, validate_response):
+def test_chat_interaction_create_happy_path(
+    mock_session,
+    mock_active_episode,
+    mock_create_interaction,
+    _mock_user_profile,
+    client,
+    rsa_keypair,
+    api_spec,
+    validate_response,
+):
     mock_session.return_value.__enter__.return_value = MagicMock()
     episode = _episode_row()
     mock_active_episode.return_value = episode

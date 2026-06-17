@@ -21,8 +21,6 @@ def _episode_row() -> CareEpisode:
     return CareEpisode(
         episode_uuid=uuid.UUID(EPISODE),
         patient_uuid=uuid.UUID(PATIENT),
-        display_code="PT-001",
-        display_name="Alex Patient",
         surgery="Knee scope",
         procedure_date=datetime.date.today(),
         recovery_id="sess-1",
@@ -42,9 +40,13 @@ def test_require_episode_not_found(_mock_active):
         require_episode(db, PATIENT)
 
 
+@patch(
+    "src.services.chat_proxy_service.user_client.get_user_profile",
+    return_value={"display_code": "PT-001", "display_name": "Alex Patient"},
+)
 @patch("src.services.chat_proxy_service.get_active_episode")
 @patch("src.services.chat_proxy_service.chat_client.create_interaction")
-def test_create_chat_interaction(mock_create, mock_active):
+def test_create_chat_interaction(mock_create, mock_active, _mock_user):
     episode = _episode_row()
     db = MagicMock()
     mock_active.return_value = episode
@@ -59,9 +61,13 @@ def test_create_chat_interaction(mock_create, mock_active):
     assert kwargs["context"]["tenant_uuid"] == str(episode.tenant_uuid)
 
 
+@patch(
+    "src.services.chat_proxy_service.user_client.get_user_profile",
+    return_value={"display_code": "PT-001", "display_name": "Alex Patient"},
+)
 @patch("src.services.chat_proxy_service.get_active_episode")
 @patch("src.services.chat_proxy_service.chat_client.create_interaction")
-def test_create_chat_interaction_prefers_jwt_tenant(mock_create, mock_active):
+def test_create_chat_interaction_prefers_jwt_tenant(mock_create, mock_active, _mock_user):
     app = Flask(__name__)
     jwt_tenant = "00000000-0000-7000-8000-000000000099"
     db = MagicMock()

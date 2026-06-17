@@ -225,8 +225,6 @@ def post_start_episode(patient_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
     required = (
         "tenant_uuid",
-        "display_code",
-        "display_name",
         "surgery",
         "procedure_date",
         "recovery_id",
@@ -353,8 +351,6 @@ def post_care_episode() -> Response:
     required = (
         "patient_uuid",
         "tenant_uuid",
-        "display_code",
-        "display_name",
         "surgery",
         "procedure_date",
         "recovery_id",

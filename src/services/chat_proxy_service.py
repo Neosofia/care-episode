@@ -7,7 +7,7 @@ from authorization_in_the_middle.flask_identity import jwt_claim_principal_attri
 from flask import g, has_request_context
 from werkzeug.exceptions import Conflict, NotFound
 
-from src.clients import chat_client
+from src.clients import chat_client, user_client
 from src.models.care_episode import EPISODE_STATUS_ACTIVE, CareEpisode
 from src.services.care_episode_service import (
     _default_last_activity,
@@ -43,7 +43,12 @@ def require_active_episode(db, patient_uuid: str) -> CareEpisode:
 
 def create_chat_interaction(db, patient_uuid: str) -> dict[str, Any]:
     episode = require_active_episode(db, patient_uuid)
-    context = build_interaction_context(episode, tenant_uuid=_jwt_tenant_uuid())
+    patient_profile = user_client.get_user_profile(patient_uuid)
+    context = build_interaction_context(
+        episode,
+        tenant_uuid=_jwt_tenant_uuid(),
+        patient_profile=patient_profile,
+    )
     interaction = chat_client.create_interaction(patient_uuid, context=context)
     return {**interaction, "care_episode_uuid": str(episode.episode_uuid)}
 

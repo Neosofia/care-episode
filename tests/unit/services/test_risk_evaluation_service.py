@@ -23,8 +23,6 @@ def _episode() -> CareEpisode:
     return CareEpisode(
         episode_uuid=uuid.uuid7(),
         patient_uuid=PATIENT,
-        display_code="PT-001",
-        display_name="Alex Patient",
         surgery="Knee scope",
         procedure_date=__import__("datetime").date.today(),
         recovery_id="rec-1",
@@ -57,6 +55,10 @@ def test_update_risk_after_patient_chat_message_when_inference_unconfigured(mock
 
 
 @patch(
+    "src.services.risk_evaluation_service.user_client.get_user_profile",
+    return_value={"display_code": "PT-001", "display_name": "Alex Patient"},
+)
+@patch(
     "src.services.risk_evaluation_service._submit_high_risk_escalation_to_notification",
     return_value=True,
 )
@@ -72,6 +74,7 @@ def test_update_risk_after_patient_chat_message_updates_episode_and_escalates(
     mock_configured,
     mock_evaluate,
     mock_escalate,
+    _mock_user_profile,
 ):
     db = MagicMock()
     db.get.return_value = None
@@ -89,6 +92,8 @@ def test_update_risk_after_patient_chat_message_updates_episode_and_escalates(
     assert episode.risk_level == "high"
     mock_escalate.assert_called_once_with(
         episode,
+        patient_display_code="PT-001",
+        patient_display_name="Alex Patient",
         chat_interaction_uuid=INTERACTION,
         tenant_uuid=TENANT,
         chat_message_uuid=MESSAGE,
@@ -97,6 +102,10 @@ def test_update_risk_after_patient_chat_message_updates_episode_and_escalates(
     db.commit.assert_called_once()
 
 
+@patch(
+    "src.services.risk_evaluation_service.user_client.get_user_profile",
+    return_value={"display_code": "PT-001", "display_name": "Alex Patient"},
+)
 @patch("src.services.risk_evaluation_service.notification_client.submit_clinical_escalation")
 @patch(
     "src.services.risk_evaluation_service.RiskAgent.evaluate",
@@ -110,6 +119,7 @@ def test_update_risk_after_patient_chat_message_escalation_includes_clinical_con
     mock_configured,
     mock_evaluate,
     mock_submit,
+    _mock_user_profile,
 ):
     db = MagicMock()
     db.get.return_value = None
@@ -132,6 +142,10 @@ def test_update_risk_after_patient_chat_message_escalation_includes_clinical_con
 
 
 @patch(
+    "src.services.risk_evaluation_service.user_client.get_user_profile",
+    return_value={"display_code": "PT-001", "display_name": "Alex Patient"},
+)
+@patch(
     "src.services.risk_evaluation_service.RiskAgent.evaluate",
     return_value=RiskAgentResult(risk_level="low", summary="Stable recovery check-in."),
 )
@@ -139,6 +153,7 @@ def test_update_risk_after_patient_chat_message_escalation_includes_clinical_con
 def test_update_risk_after_patient_chat_message_updates_interaction_summary(
     mock_configured,
     mock_evaluate,
+    _mock_user_profile,
 ):
     db = MagicMock()
     interaction_risk_summary = InteractionRiskState(

@@ -1,3 +1,27 @@
+# Installation Plan — care-episode v0.8.1
+
+Per-version deploy and verification steps for operators.
+
+## Deploy steps
+
+1. Pull image `ghcr.io/neosofia/care-episode:v0.8.1` (tag `care-episode/v0.8.1`).
+2. Run migrations to head (revision **`012`**: drop denormalized patient labels from recoveries).
+3. Redeploy **CDP UI 2026.06.19** (or later) in the same change window — UI no longer sends patient labels on care-episode upsert/start.
+4. Ensure **user** is registered and reachable from care-episode mesh (chat proxy and risk escalation resolve patient labels via `GET /api/v1/users/{uuid}`).
+
+## Post-deploy verification
+
+1. `GET /health` returns `"status": "ok"` and `"version": "0.8.1"`.
+2. `SELECT version_num FROM alembic_version` reports **`012`**.
+3. `GET /api/v1/care-episodes?tenant_uuid=<tenant>` episode objects omit `display_code` and `display_name`; roster labels come from User registry in the UI.
+4. Patient chat completion still succeeds (User profile fetched for interaction context).
+
+## Evidence
+
+- Health version **0.8.1**; migration **012** applied; staging E2E close/reopen passes for **DEMO-123**.
+
+---
+
 # Installation Plan — care-episode v0.8.0
 
 Per-version deploy and verification steps for operators.

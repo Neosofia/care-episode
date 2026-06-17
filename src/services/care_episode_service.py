@@ -71,8 +71,6 @@ def _episode_dict(
     payload = {
         "episode_uuid": str(episode.episode_uuid),
         "patient_uuid": str(episode.patient_uuid),
-        "display_code": episode.display_code,
-        "display_name": episode.display_name,
         "surgery": episode.surgery,
         "procedure_date": episode.procedure_date.isoformat(),
         "recovery_id": episode.recovery_id,
@@ -183,7 +181,7 @@ def list_episodes(db, tenant_uuid: str | None = None, *, status: str | None = No
             _episode_priority(),
             CareEpisode.changed_at.desc(),
             CareEpisode.procedure_date.desc(),
-            CareEpisode.display_name.asc(),
+            CareEpisode.surgery.asc(),
         )
         .all()
     )
@@ -236,8 +234,6 @@ def _apply_episode_payload(
     changed_by_type: int,
     care_window_optional: bool = False,
 ) -> None:
-    episode.display_code = str(payload["display_code"])
-    episode.display_name = str(payload["display_name"])
     episode.surgery = str(payload["surgery"])
     episode.procedure_date = datetime.date.fromisoformat(str(payload["procedure_date"]))
     episode.recovery_id = str(payload["recovery_id"])

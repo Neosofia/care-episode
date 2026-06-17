@@ -92,8 +92,6 @@ def _recovery_payload(*, patient_uuid: str = SUB) -> dict:
     return {
         "patient_uuid": patient_uuid,
         "tenant_uuid": TENANT,
-        "display_code": "DEMO-001",
-        "display_name": "Demo Recovery",
         "surgery": "Knee arthroscopy",
         "procedure_date": "2026-01-15",
         "recovery_id": "recovery-demo-001",

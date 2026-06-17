@@ -7,7 +7,7 @@ from werkzeug.exceptions import BadGateway, ServiceUnavailable
 
 from src.bootstrap.config import settings
 from src.bootstrap.request_telemetry import log_request_handled
-from src.clients import notification_client
+from src.clients import notification_client, user_client
 from src.models.care_episode import CareEpisode
 from src.models.risk import InteractionRiskState
 from src.services.chat_context import build_interaction_context, days_post_op_for
@@ -63,6 +63,8 @@ def _build_risk_evaluation_response(
 def _submit_high_risk_escalation_to_notification(
     episode: CareEpisode,
     *,
+    patient_display_code: str,
+    patient_display_name: str,
     chat_interaction_uuid: uuid.UUID,
     tenant_uuid: uuid.UUID,
     chat_message_uuid: uuid.UUID,
@@ -73,8 +75,8 @@ def _submit_high_risk_escalation_to_notification(
 
     try:
         notification_client.submit_clinical_escalation(
-            patient_display_code=episode.display_code,
-            patient_display_name=episode.display_name,
+            patient_display_code=patient_display_code,
+            patient_display_name=patient_display_name,
             procedure_name=episode.surgery,
             days_post_op=days_post_op_for(episode),
             care_summary=care_summary,
@@ -122,9 +124,12 @@ def update_risk_after_patient_chat_message(
         episode.patient_uuid,
     )
 
+    patient_profile = user_client.get_user_profile(str(episode.patient_uuid))
+
     risk_agent_episode_context = build_interaction_context(
         episode,
         tenant_uuid=str(parsed_tenant_uuid),
+        patient_profile=patient_profile,
     )
     risk_agent_episode_context["current_risk_level"] = episode.risk_level or "low"
 
@@ -154,6 +159,8 @@ def update_risk_after_patient_chat_message(
     if risk_agent_result.risk_level == "high":
         clinician_escalation_submitted = _submit_high_risk_escalation_to_notification(
             episode,
+            patient_display_code=patient_profile["display_code"],
+            patient_display_name=patient_profile["display_name"],
             chat_interaction_uuid=parsed_chat_interaction_uuid,
             tenant_uuid=parsed_tenant_uuid,
             chat_message_uuid=chat_message_uuid,

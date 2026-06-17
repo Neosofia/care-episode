@@ -1123,8 +1123,6 @@
         "required": [
           "episode_uuid",
           "patient_uuid",
-          "display_code",
-          "display_name",
           "surgery",
           "procedure_date",
           "days_post_op",
@@ -1139,12 +1137,6 @@
           "patient_uuid": {
             "type": "string",
             "format": "uuid"
-          },
-          "display_code": {
-            "type": "string"
-          },
-          "display_name": {
-            "type": "string"
           },
           "surgery": {
             "type": "string"
@@ -1201,8 +1193,6 @@
         "required": [
           "patient_uuid",
           "tenant_uuid",
-          "display_code",
-          "display_name",
           "surgery",
           "procedure_date",
           "recovery_id",
@@ -1216,12 +1206,6 @@
           "tenant_uuid": {
             "type": "string",
             "format": "uuid"
-          },
-          "display_code": {
-            "type": "string"
-          },
-          "display_name": {
-            "type": "string"
           },
           "surgery": {
             "type": "string"
@@ -1260,8 +1244,6 @@
         "type": "object",
         "required": [
           "tenant_uuid",
-          "display_code",
-          "display_name",
           "surgery",
           "procedure_date",
           "recovery_id",
@@ -1271,12 +1253,6 @@
           "tenant_uuid": {
             "type": "string",
             "format": "uuid"
-          },
-          "display_code": {
-            "type": "string"
-          },
-          "display_name": {
-            "type": "string"
           },
           "surgery": {
             "type": "string"
@@ -1312,8 +1288,6 @@
         "required": [
           "episode_uuid",
           "patient_uuid",
-          "display_code",
-          "display_name",
           "surgery",
           "procedure_date",
           "recovery_id",
@@ -1329,12 +1303,6 @@
           "patient_uuid": {
             "type": "string",
             "format": "uuid"
-          },
-          "display_code": {
-            "type": "string"
-          },
-          "display_name": {
-            "type": "string"
           },
           "surgery": {
             "type": "string"

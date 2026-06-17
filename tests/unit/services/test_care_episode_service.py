@@ -23,8 +23,6 @@ def _episode_mock(*, status: str = "active", surgery: str = "Appendectomy") -> M
     episode = MagicMock()
     episode.episode_uuid = EPISODE_ID
     episode.patient_uuid = PATIENT_ID
-    episode.display_code = "PAT-1"
-    episode.display_name = "Alice Hartley"
     episode.surgery = surgery
     episode.procedure_date = datetime.date(2026, 5, 28)
     episode.recovery_id = "S-1"
@@ -79,8 +77,6 @@ def test_upsert_episode_updates_care_window_days_on_active_episode():
         {
             "patient_uuid": str(PATIENT_ID),
             "tenant_uuid": str(TENANT_ID),
-            "display_code": "PAT-1",
-            "display_name": "Alice Hartley",
             "surgery": "Appendectomy",
             "procedure_date": "2026-06-01",
             "recovery_id": "EP-PAT1",
@@ -133,8 +129,6 @@ def test_start_new_episode_rejects_active_episode():
             str(PATIENT_ID),
             {
                 "tenant_uuid": str(TENANT_ID),
-                "display_code": "PAT-1",
-                "display_name": "Alice Hartley",
                 "surgery": "Appendectomy",
                 "procedure_date": "2026-06-01",
                 "recovery_id": "EP-PAT1",
@@ -162,8 +156,6 @@ def test_upsert_episode_rejects_update_when_only_closed_episodes_exist():
             {
                 "patient_uuid": str(PATIENT_ID),
                 "tenant_uuid": str(TENANT_ID),
-                "display_code": "PAT-1",
-                "display_name": "Alice Hartley",
                 "surgery": "Appendectomy",
                 "procedure_date": "2026-06-01",
                 "recovery_id": "EP-PAT1",

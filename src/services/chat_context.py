@@ -15,13 +15,15 @@ def build_interaction_context(
     episode: CareEpisode,
     *,
     tenant_uuid: str | None = None,
+    patient_profile: dict[str, str] | None = None,
 ) -> dict[str, str | int]:
-    """Authoritative interaction context from care episode data."""
+    """Authoritative interaction context from care episode data and User registry labels."""
     context: dict[str, str | int] = {}
     tenant = (tenant_uuid or str(episode.tenant_uuid)).strip()
     if tenant:
         context["tenant_uuid"] = tenant
-    display_name = episode.display_name.strip()
+    profile = patient_profile or {}
+    display_name = str(profile.get("display_name") or "").strip()
     if display_name:
         context["patient_display_name"] = display_name
         first_name = display_name.split(maxsplit=1)[0]
