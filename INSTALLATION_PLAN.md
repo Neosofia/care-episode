@@ -1,3 +1,26 @@
+# Installation Plan — care-episode v0.7.2
+
+Per-version deploy and verification steps for operators.
+
+## Deploy steps
+
+1. Pull image `ghcr.io/neosofia/care-episode:v0.7.2` (tag `care-episode/v0.7.2`).
+2. No new migrations.
+3. Ensure **notification** is registered in the service registry (`slug: notification`) when **`RISK_ESCALATION_ENABLED`** is true (default).
+4. Optional: set **`CLINICAL_RISK_ALERT_FROM_EMAIL`** (default `care-episode-alerts@neosofia.tech`).
+5. Review gunicorn and upstream timeout env vars if overridden locally (defaults: **`WEB_CONCURRENCY=1`**, **`GUNICORN_THREADS=32`**, **`GUNICORN_TIMEOUT=15`**; mesh hops **`CHAT_SERVICE_TIMEOUT_SECONDS`**, **`INFERENCE_TIMEOUT_SECONDS`**, **`NOTIFICATION_SERVICE_TIMEOUT_SECONDS`**, **`AUTHENTICATION_TOKEN_TIMEOUT_SECONDS`** default **10**).
+
+## Post-deploy verification
+
+1. `GET /health` returns `"status": "ok"` and `"version": "0.7.2"`.
+2. High-risk chat completion triggers a clinical alert email via notification (`POST /api/emails`) when escalation is enabled.
+
+## Evidence
+
+- Health version **0.7.2**; structured logs show successful chat proxy and risk evaluation outcomes.
+
+---
+
 # Installation Plan — care-episode v0.7.1
 
 Per-version deploy and verification steps for operators.
@@ -48,7 +71,7 @@ Per-version deploy and verification steps for operators.
 2. Run migrations to head (revision **`008`** — `interaction_risk_states`; risk level on `care_episode_recoveries`).
 3. Set **`INFERENCE_COMPLETIONS_URL`**, **`INFERENCE_API_KEY`**, and **`INFERENCE_MODEL`** for clinical risk evaluation (same gateway pattern as Chat inference).
 4. Keep **`CARE_EPISODE_CLIENT_SECRET`** and Chat registry entry from prior releases.
-5. Optional: set **`RISK_ESCALATION_ENABLED=false`** to disable notification handoff until notification ships `POST /api/v1/escalations`.
+5. Optional: set **`RISK_ESCALATION_ENABLED=false`** to disable high-risk email alerts. Ensure **notification** is registered in the service registry (`slug: notification`) so CE can reach `POST /api/emails`.
 
 ## Post-deploy verification
 

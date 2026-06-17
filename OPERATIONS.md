@@ -68,7 +68,8 @@ After Chat persists a patient **content** turn, CE runs a dedicated risk agent (
 | `INFERENCE_API_KEY` | Bearer token for the gateway |
 | `INFERENCE_MODEL` | Model id for risk evaluation |
 | `INFERENCE_TEMPERATURE` | Default `0.2` |
-| `RISK_ESCALATION_ENABLED` | Default `true`; `high` outcomes POST to notification |
+| `RISK_ESCALATION_ENABLED` | Default `true`; `high` outcomes email via notification `POST /api/emails` |
+| `CLINICAL_RISK_ALERT_FROM_EMAIL` | Default `care-episode-alerts@neosofia.tech`; `reply_to` on alert emails |
 
 When inference is unconfigured or unavailable, the completion still returns **200** from Chat; `risk_evaluation.risk_level` is `failed-pending-review` and recovery `risk_level` is unchanged. **`high`** is the only level that triggers escalation.
 

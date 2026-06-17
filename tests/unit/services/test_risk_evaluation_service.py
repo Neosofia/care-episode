@@ -85,8 +85,48 @@ def test_update_risk_after_patient_chat_message_updates_recovery_and_escalates(
 
     assert result == {"risk_level": "high", "escalated": True}
     assert recovery.risk_level == "high"
-    mock_escalate.assert_called_once()
+    mock_escalate.assert_called_once_with(
+        recovery,
+        chat_interaction_uuid=INTERACTION,
+        tenant_uuid=TENANT,
+        chat_message_uuid=MESSAGE,
+        care_summary="Patient reports crushing chest pain on day 2 post-op.",
+    )
     db.commit.assert_called_once()
+
+
+@patch("src.services.risk_evaluation_service.notification_client.submit_clinical_escalation")
+@patch(
+    "src.services.risk_evaluation_service.RiskAgent.evaluate",
+    return_value=RiskAgentResult(
+        risk_level="high",
+        summary="Patient reports crushing chest pain on day 2 post-op.",
+    ),
+)
+@patch("src.services.risk_evaluation_service.risk_inference_configured", return_value=True)
+def test_update_risk_after_patient_chat_message_escalation_includes_clinical_context(
+    mock_configured,
+    mock_evaluate,
+    mock_submit,
+):
+    db = MagicMock()
+    db.get.return_value = None
+    mock_submit.return_value = None
+
+    update_risk_after_patient_chat_message(
+        db,
+        recovery=_recovery(),
+        chat_interaction_uuid=str(INTERACTION),
+        message_uuid=str(MESSAGE),
+        patient_message="crushing chest pain",
+    )
+
+    mock_submit.assert_called_once()
+    kwargs = mock_submit.call_args.kwargs
+    assert kwargs["patient_display_code"] == "PT-001"
+    assert kwargs["patient_display_name"] == "Alex Patient"
+    assert kwargs["procedure_name"] == "Knee scope"
+    assert kwargs["care_summary"] == "Patient reports crushing chest pain on day 2 post-op."
 
 
 @patch(

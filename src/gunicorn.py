@@ -4,6 +4,7 @@ from src.bootstrap.config import settings
 
 # --- Gunicorn Configuration ---
 bind = f"0.0.0.0:{settings.port}"
+worker_class = "gthread"
 workers = settings.web_concurrency
 threads = settings.gunicorn_threads
 timeout = settings.gunicorn_timeout

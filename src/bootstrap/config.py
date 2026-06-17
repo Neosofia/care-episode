@@ -45,16 +45,18 @@ class Settings(BaseSettings):
     care_episode_read_rate_limit: str = "120 per minute"
     care_episode_write_rate_limit: str = "60 per minute"
 
-    # Chat service proxy (patient write path; base URL resolved via auth service registry)
-    chat_service_timeout_seconds: float = Field(default=90.0, gt=0)
+    # UI-facing upstream timeouts — each must stay at or below 10 seconds.
+    chat_service_timeout_seconds: float = Field(default=10.0, gt=0, le=10.0)
 
     # Clinical risk inference (Bedrock/OpenAI-compatible completions API)
     inference_completions_url: str = ""
     inference_api_key: str | None = None
     inference_model: str = ""
     inference_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    inference_timeout_seconds: float = Field(default=10.0, gt=0, le=10.0)
     risk_escalation_enabled: bool = True
-    notification_service_timeout_seconds: float = Field(default=15.0, gt=0)
+    clinical_risk_alert_from_email: str = "care-episode-alerts@neosofia.tech"
+    notification_service_timeout_seconds: float = Field(default=10.0, gt=0, le=10.0)
 
     # Demo template patient (DEMO-123); exposed on principal as demoTemplatePatientUuid for Cedar.
     demo_template_patient_uuid: str = Field(
@@ -65,13 +67,13 @@ class Settings(BaseSettings):
     # Service-to-service auth and registry discovery
     authentication_service_base_url: str = ""
     care_episode_client_secret: str = ""
-    authentication_token_timeout_seconds: float = Field(default=10.0, gt=0)
+    authentication_token_timeout_seconds: float = Field(default=10.0, gt=0, le=10.0)
     service_registry_cache_ttl_seconds: int = Field(default=60, ge=0)
 
-    # Gunicorn settings
-    web_concurrency: int = Field(default=2, ge=1)
-    gunicorn_threads: int = Field(default=2, ge=1)
-    gunicorn_timeout: int = Field(default=30, ge=1)
+    # Gunicorn — worker request silence limit; slightly above per-hop UI timeouts to avoid end-of-request races
+    web_concurrency: int = Field(default=1, ge=1)
+    gunicorn_threads: int = Field(default=32, ge=1)
+    gunicorn_timeout: int = Field(default=15, ge=1)
     
     # CORS settings
     frontend_url: str = Field(default="http://localhost:5173")

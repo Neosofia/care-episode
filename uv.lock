@@ -103,7 +103,7 @@ wheels = [
 
 [[package]]
 name = "care-episode"
-version = "0.7.1"
+version = "0.7.2"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
@@ -117,6 +117,7 @@ dependencies = [
     { name = "gunicorn" },
     { name = "httpx" },
     { name = "logenvelope" },
+    { name = "platform-client" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -148,6 +149,7 @@ requires-dist = [
     { name = "gunicorn", specifier = ">=21.2.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "logenvelope", url = "https://github.com/Neosofia/sdk/releases/download/logenvelope/v0.3.4/logenvelope-0.3.4-py3-none-any.whl" },
+    { name = "platform-client", url = "https://github.com/Neosofia/sdk/releases/download/platform-client/v0.2.0/platform_client-0.2.0-py3-none-any.whl" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0,<3.0.0" },
@@ -721,6 +723,20 @@ sdist = { url = "https://files.pythonhosted.org/packages/d7/f1/e7a6dd94a8d4a5626
 wheels = [
     { url = "https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl", hash = "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e", size = 100195, upload-time = "2026-04-24T20:15:22.081Z" },
 ]
+
+[[package]]
+name = "platform-client"
+version = "0.2.0"
+source = { url = "https://github.com/Neosofia/sdk/releases/download/platform-client/v0.2.0/platform_client-0.2.0-py3-none-any.whl" }
+dependencies = [
+    { name = "httpx" },
+]
+wheels = [
+    { url = "https://github.com/Neosofia/sdk/releases/download/platform-client/v0.2.0/platform_client-0.2.0-py3-none-any.whl", hash = "sha256:f5b2b35dcd5d287eaee3c648708d84c8c2782a6c53d79fd2fe0fe2a2eb641a2c" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "httpx", specifier = ">=0.27.0" }]
 
 [[package]]
 name = "pluggy"

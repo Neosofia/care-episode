@@ -10,7 +10,7 @@ from src.bootstrap.request_telemetry import log_request_handled
 from src.clients import notification_client
 from src.models.care_episode import CareEpisodeRecovery
 from src.models.risk import InteractionRiskState
-from src.services.chat_context import build_interaction_context
+from src.services.chat_context import build_interaction_context, days_post_op_for
 from src.services.inference_health import risk_inference_configured
 from src.services.risk_agent_service import RiskAgent
 
@@ -61,29 +61,33 @@ def _build_risk_evaluation_response(
 
 
 def _submit_high_risk_escalation_to_notification(
-    patient_uuid: uuid.UUID,
+    recovery: CareEpisodeRecovery,
+    *,
     chat_interaction_uuid: uuid.UUID,
     tenant_uuid: uuid.UUID,
     chat_message_uuid: uuid.UUID,
+    care_summary: str,
 ) -> bool:
     if not settings.risk_escalation_enabled:
         return False
 
-    escalation_payload = {
-        "patient_uuid": str(patient_uuid),
-        "chat_interaction_uuid": str(chat_interaction_uuid),
-        "tenant_uuid": str(tenant_uuid),
-        "message_uuid": str(chat_message_uuid),
-        "severity": "high",
-        "alert_type": "clinical_risk",
-    }
     try:
-        notification_client.submit_clinical_escalation(escalation_payload)
+        notification_client.submit_clinical_escalation(
+            patient_display_code=recovery.display_code,
+            patient_display_name=recovery.display_name,
+            procedure_name=recovery.surgery,
+            days_post_op=days_post_op_for(recovery),
+            care_summary=care_summary,
+            patient_uuid=str(recovery.patient_uuid),
+            tenant_uuid=str(tenant_uuid),
+            chat_interaction_uuid=str(chat_interaction_uuid),
+            message_uuid=str(chat_message_uuid),
+        )
     except BadGateway:
         log_request_handled("risk_escalation", 502, outcome="notification_downstream")
         return False
 
-    log_request_handled("risk_escalation", 202, outcome="submitted")
+    log_request_handled("risk_escalation", 200, outcome="submitted")
     return True
 
 
@@ -149,10 +153,11 @@ def update_risk_after_patient_chat_message(
     clinician_escalation_submitted = False
     if risk_agent_result.risk_level == "high":
         clinician_escalation_submitted = _submit_high_risk_escalation_to_notification(
-            recovery.patient_uuid,
-            parsed_chat_interaction_uuid,
-            parsed_tenant_uuid,
-            chat_message_uuid,
+            recovery,
+            chat_interaction_uuid=parsed_chat_interaction_uuid,
+            tenant_uuid=parsed_tenant_uuid,
+            chat_message_uuid=chat_message_uuid,
+            care_summary=risk_agent_result.summary,
         )
 
     db.commit()

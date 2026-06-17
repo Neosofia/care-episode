@@ -10,8 +10,8 @@ from werkzeug.exceptions import ServiceUnavailable
 from src.bootstrap.config import settings
 from src.services.inference_health import risk_inference_configured
 
-INFERENCE_TIMEOUT_SECONDS = 60.0
-INFERENCE_MAX_COMPLETION_TOKENS = 512
+# Soft cap: SYSTEM_PROMPT asks the model for summary max 400 words; tokens are the hard API limit.
+INFERENCE_MAX_COMPLETION_TOKENS = 1024
 
 AGENT_CONTEXT_START = "<<<NEOSOFIA_RISK_CONTEXT_START>>>"
 AGENT_CONTEXT_END = "<<<NEOSOFIA_RISK_CONTEXT_END>>>"
@@ -125,7 +125,7 @@ Rules:
                     "Content-Type": "application/json",
                 },
                 json=payload,
-                timeout=INFERENCE_TIMEOUT_SECONDS,
+                timeout=settings.inference_timeout_seconds,
             )
             response.raise_for_status()
         except httpx.HTTPError as exc:
