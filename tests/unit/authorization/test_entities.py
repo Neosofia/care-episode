@@ -24,7 +24,22 @@ def test_resolve_principal_sets_demo_template_and_flags(app):
 
 def test_registry_care_episode_cedar_attrs_maps_patient_uuid():
     attrs = entities.registry_care_episode_cedar_attrs({"patient_uuid": "00000000-0000-7000-8000-000000000003"})
-    assert attrs == {"patientUuid": "00000000-0000-7000-8000-000000000003"}
+    assert attrs == {
+        "patientUuid": "00000000-0000-7000-8000-000000000003",
+    }
+
+
+def test_registry_care_episode_cedar_attrs_maps_tenant_uuid():
+    attrs = entities.registry_care_episode_cedar_attrs(
+        {
+            "patient_uuid": "00000000-0000-7000-8000-000000000003",
+            "tenant_uuid": "00000000-0000-7000-8000-000000000010",
+        }
+    )
+    assert attrs == {
+        "patientUuid": "00000000-0000-7000-8000-000000000003",
+        "tenantId": "00000000-0000-7000-8000-000000000010",
+    }
 
 
 def test_synthesized_member_entities_bind_path_patient_uuid(app):

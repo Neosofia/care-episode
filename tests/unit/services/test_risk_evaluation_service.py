@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.models.care_episode import CareEpisodeRecovery
+from src.models.care_episode import CareEpisode
 from src.models.risk import InteractionRiskState
 from src.services.risk_agent_service import RiskAgentResult
 from src.services.risk_evaluation_service import (
@@ -19,14 +19,16 @@ MESSAGE = uuid.UUID("00000000-0000-7000-8000-000000000003")
 TENANT = uuid.UUID("00000000-0000-7000-8000-000000000010")
 
 
-def _recovery() -> CareEpisodeRecovery:
-    return CareEpisodeRecovery(
+def _episode() -> CareEpisode:
+    return CareEpisode(
+        episode_uuid=uuid.uuid7(),
         patient_uuid=PATIENT,
         display_code="PT-001",
         display_name="Alex Patient",
         surgery="Knee scope",
         procedure_date=__import__("datetime").date.today(),
         recovery_id="rec-1",
+        last_activity="2026-06-01T12:00:00Z",
         risk_level="low",
         tenant_uuid=TENANT,
         changed_by_uuid=uuid.UUID("00000000-0000-7000-8000-000000000000"),
@@ -40,7 +42,7 @@ def test_update_risk_after_patient_chat_message_when_inference_unconfigured(mock
 
     result = update_risk_after_patient_chat_message(
         db,
-        recovery=_recovery(),
+        episode=_episode(),
         chat_interaction_uuid=str(INTERACTION),
         message_uuid=str(MESSAGE),
         patient_message="I feel dizzy",
@@ -66,7 +68,7 @@ def test_update_risk_after_patient_chat_message_when_inference_unconfigured(mock
     ),
 )
 @patch("src.services.risk_evaluation_service.risk_inference_configured", return_value=True)
-def test_update_risk_after_patient_chat_message_updates_recovery_and_escalates(
+def test_update_risk_after_patient_chat_message_updates_episode_and_escalates(
     mock_configured,
     mock_evaluate,
     mock_escalate,
@@ -74,19 +76,19 @@ def test_update_risk_after_patient_chat_message_updates_recovery_and_escalates(
     db = MagicMock()
     db.get.return_value = None
 
-    recovery = _recovery()
+    episode = _episode()
     result = update_risk_after_patient_chat_message(
         db,
-        recovery=recovery,
+        episode=episode,
         chat_interaction_uuid=str(INTERACTION),
         message_uuid=str(MESSAGE),
         patient_message="crushing chest pain",
     )
 
     assert result == {"risk_level": "high", "escalated": True}
-    assert recovery.risk_level == "high"
+    assert episode.risk_level == "high"
     mock_escalate.assert_called_once_with(
-        recovery,
+        episode,
         chat_interaction_uuid=INTERACTION,
         tenant_uuid=TENANT,
         chat_message_uuid=MESSAGE,
@@ -115,7 +117,7 @@ def test_update_risk_after_patient_chat_message_escalation_includes_clinical_con
 
     update_risk_after_patient_chat_message(
         db,
-        recovery=_recovery(),
+        episode=_episode(),
         chat_interaction_uuid=str(INTERACTION),
         message_uuid=str(MESSAGE),
         patient_message="crushing chest pain",
@@ -150,7 +152,7 @@ def test_update_risk_after_patient_chat_message_updates_interaction_summary(
 
     update_risk_after_patient_chat_message(
         db,
-        recovery=_recovery(),
+        episode=_episode(),
         chat_interaction_uuid=str(INTERACTION),
         message_uuid=str(MESSAGE),
         patient_message="feeling better",

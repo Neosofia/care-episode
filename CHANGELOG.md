@@ -2,6 +2,32 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.8.0] - 2026-06-18
+
+### Added
+
+- **Multi-episode lifecycle** — `episode_uuid` primary key, `status` (`active` / `closed`), and per-patient history; at most one active episode per patient.
+- **`GET/PATCH /api/v1/care-episodes/{episode_uuid}`** — read and patch a specific episode (close/reopen via `status`).
+- **`GET/POST /api/v1/care-episodes/{patient_uuid}/episodes`** — list history and start a new episode for a patient.
+- **`POST /api/v1/care-episodes/bulk-close`** — close active episodes for multiple patients in one request.
+- **`care_window_days`** on episodes (migration **010**).
+- **Tenant-scoped Cedar** — clinicians may list and mutate care episodes only when `principal.tenantId` matches the episode or catalog tenant.
+
+### Changed
+
+- Recovery-oriented routes and OpenAPI names align on **episode** vocabulary (`/care-episodes`, not `/recoveries`); response field **`recovery_id`** is unchanged (external session id).
+- Closure time is derived from **`changed_at`** when `status` is `closed`; redundant **`closed_at`** column removed (migration **011**).
+
+### Removed
+
+- **`POST /api/v1/care-episodes/recoveries`** and other legacy recovery path aliases — use catalog upsert and patient episode routes instead.
+
+## [0.7.2] - 2026-06-17
+
+### Changed
+
+- Platform-client mesh wiring and clinical risk alert delivery via notification (see [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md)).
+
 ## [0.7.1] - 2026-06-16
 
 ### Fixed

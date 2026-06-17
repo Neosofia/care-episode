@@ -3,7 +3,10 @@ from __future__ import annotations
 import datetime
 import uuid
 
-from sqlalchemy import Date, DateTime, String, Text, text
+from sqlalchemy import Date, DateTime, Integer, String, Text, text
+
+EPISODE_STATUS_ACTIVE = "active"
+EPISODE_STATUS_CLOSED = "closed"
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,10 +14,11 @@ from src.db.base import Base
 from src.models.audit_mixin import AuditColumnsMixin
 
 
-class CareEpisodeRecovery(Base, AuditColumnsMixin):
+class CareEpisode(Base, AuditColumnsMixin):
     __tablename__ = "care_episode_recoveries"
 
-    patient_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    episode_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    patient_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     display_code: Mapped[str] = mapped_column(String(32), nullable=False)
     display_name: Mapped[str] = mapped_column(String(128), nullable=False)
     surgery: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -22,6 +26,8 @@ class CareEpisodeRecovery(Base, AuditColumnsMixin):
     recovery_id: Mapped[str] = mapped_column(String(64), nullable=False)
     last_activity: Mapped[str] = mapped_column(String(64), nullable=False)
     risk_level: Mapped[str] = mapped_column(String(16), nullable=False, default="low")
+    care_window_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=EPISODE_STATUS_ACTIVE)
     tenant_uuid: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
 
 

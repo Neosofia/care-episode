@@ -35,14 +35,21 @@ def resolve_principal() -> dict[str, Any]:
 def registry_care_episode_cedar_attrs(row: dict[str, Any]) -> dict[str, Any]:
     """Map patient rows to Cedar member attrs (SDK synthesizes builders from this)."""
     patient_uuid = str(row.get("patient_uuid") or row.get(MEMBER_ID_FIELD) or "").strip()
-    return {"patientUuid": patient_uuid}
+    attrs: dict[str, Any] = {"patientUuid": patient_uuid}
+    tenant_uuid = str(row.get("tenant_uuid") or "").strip()
+    if tenant_uuid:
+        attrs["tenantId"] = tenant_uuid
+    return attrs
 
 
-def build_care_episode_entity(patient_uuid: str) -> dict[str, Any]:
+def build_care_episode_entity(patient_uuid: str, *, tenant_uuid: str = "") -> dict[str, Any]:
     """Manual Cedar entity for policy unit tests."""
     patient_uuid = str(patient_uuid).strip()
+    row = {"patient_uuid": patient_uuid}
+    if tenant_uuid:
+        row["tenant_uuid"] = tenant_uuid
     return build_entity_payload(
         f"{NAMESPACE}::CareEpisode",
         patient_uuid,
-        {"patientUuid": patient_uuid},
+        registry_care_episode_cedar_attrs(row),
     )

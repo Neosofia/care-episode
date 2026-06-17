@@ -23,9 +23,9 @@
         }
       }
     },
-    "/api/v1/care-episodes/recoveries": {
+    "/api/v1/care-episodes": {
       "get": {
-        "operationId": "listCareEpisodeRecoverys",
+        "operationId": "listCareEpisodes",
         "parameters": [
           {
             "name": "tenant_uuid",
@@ -35,6 +35,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "closed"
+              ]
+            }
           }
         ],
         "responses": {
@@ -43,7 +55,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RecoveryListResponse"
+                  "$ref": "#/components/schemas/EpisodeListResponse"
                 }
               }
             }
@@ -81,13 +93,13 @@
         }
       },
       "post": {
-        "operationId": "upsertCareEpisodeRecovery",
+        "operationId": "upsertCareEpisode",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpsertRecoveryRequest"
+                "$ref": "#/components/schemas/UpsertEpisodeRequest"
               }
             }
           }
@@ -98,7 +110,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CareEpisodeRecovery"
+                  "$ref": "#/components/schemas/CareEpisode"
                 }
               }
             }
@@ -129,6 +141,191 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/care-episodes/bulk-close": {
+      "post": {
+        "operationId": "bulkCloseCareEpisodeRecoveries",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkCloseRecoveriesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk close result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkCloseRecoveriesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/care-episodes/{episode_uuid}": {
+      "get": {
+        "operationId": "getCareEpisode",
+        "parameters": [
+          {
+            "name": "episode_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Care episode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareEpisodeHistoryEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Care episode not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchCareEpisode",
+        "parameters": [
+          {
+            "name": "episode_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchEpisodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated care episode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareEpisode"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid patch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Care episode not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/care-episodes/{patient_uuid}/episodes": {
+      "get": {
+        "operationId": "listCareEpisodes",
+        "parameters": [
+          {
+            "name": "patient_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Care episodes for a patient",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientEpisodesResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "startCareEpisode",
+        "parameters": [
+          {
+            "name": "patient_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartEpisodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New care episode started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareEpisode"
                 }
               }
             }
@@ -921,9 +1118,10 @@
           }
         }
       },
-      "CareEpisodeRecovery": {
+      "CareEpisode": {
         "type": "object",
         "required": [
+          "episode_uuid",
           "patient_uuid",
           "display_code",
           "display_name",
@@ -934,6 +1132,10 @@
           "risk_level"
         ],
         "properties": {
+          "episode_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
           "patient_uuid": {
             "type": "string",
             "format": "uuid"
@@ -968,10 +1170,33 @@
           "risk_summary": {
             "type": "string",
             "description": "Latest rolling chat risk summary for this patient, when available."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed"
+            ]
+          },
+          "tenant_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true,
+            "description": "When status is closed, the audit-maintained changed_at timestamp from the close update. Omitted when active."
+          },
+          "care_window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Post-discharge monitoring window length in days from procedure date. Defaults to 30 when omitted on create."
           }
         }
       },
-      "UpsertRecoveryRequest": {
+      "UpsertEpisodeRequest": {
         "type": "object",
         "required": [
           "patient_uuid",
@@ -1019,10 +1244,166 @@
           "changed_by_uuid": {
             "type": "string",
             "format": "uuid"
+          },
+          "reactivate": {
+            "type": "boolean",
+            "description": "When true on a closed episode, archives the prior discharge and starts a new procedure. Rejected when an active episode exists."
+          },
+          "care_window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Post-discharge monitoring window length in days. Applied on create; updatable on the active recovery."
           }
         }
       },
-      "RecoveryListResponse": {
+      "StartEpisodeRequest": {
+        "type": "object",
+        "required": [
+          "tenant_uuid",
+          "display_code",
+          "display_name",
+          "surgery",
+          "procedure_date",
+          "recovery_id",
+          "risk_level"
+        ],
+        "properties": {
+          "tenant_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_code": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "surgery": {
+            "type": "string"
+          },
+          "procedure_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "recovery_id": {
+            "type": "string"
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "changed_by_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "care_window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Post-discharge monitoring window length in days. Defaults to 30 when omitted."
+          }
+        }
+      },
+      "CareEpisodeHistoryEntry": {
+        "type": "object",
+        "required": [
+          "episode_uuid",
+          "patient_uuid",
+          "display_code",
+          "display_name",
+          "surgery",
+          "procedure_date",
+          "recovery_id",
+          "risk_level",
+          "status",
+          "is_current"
+        ],
+        "properties": {
+          "episode_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_code": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "surgery": {
+            "type": "string"
+          },
+          "procedure_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "recovery_id": {
+            "type": "string"
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed"
+            ]
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true,
+            "description": "When status is closed, the audit-maintained changed_at timestamp from the close update. Omitted when active."
+          },
+          "tenant_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_current": {
+            "type": "boolean"
+          },
+          "care_window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Post-discharge monitoring window length in days for this episode."
+          }
+        }
+      },
+      "PatchEpisodeRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed"
+            ]
+          },
+          "care_window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Post-discharge monitoring window length in days for this episode."
+          },
+          "changed_by_uuid": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PatientEpisodesResponse": {
         "type": "object",
         "required": [
           "items"
@@ -1031,8 +1412,68 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CareEpisodeRecovery"
+              "$ref": "#/components/schemas/CareEpisodeHistoryEntry"
             }
+          }
+        }
+      },
+      "EpisodeListResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CareEpisode"
+            }
+          }
+        }
+      },
+      "BulkCloseRecoveriesRequest": {
+        "type": "object",
+        "required": [
+          "patient_uuids"
+        ],
+        "properties": {
+          "patient_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "changed_by_uuid": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "BulkCloseRecoveriesResponse": {
+        "type": "object",
+        "required": [
+          "closed",
+          "skipped",
+          "count"
+        ],
+        "properties": {
+          "closed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "count": {
+            "type": "integer"
           }
         }
       },

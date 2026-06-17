@@ -1,3 +1,27 @@
+# Installation Plan — care-episode v0.8.0
+
+Per-version deploy and verification steps for operators.
+
+## Deploy steps
+
+1. Pull image `ghcr.io/neosofia/care-episode:v0.8.0` (tag `care-episode/v0.8.0`).
+2. Run migrations to head (revisions **`009`**–**`011`**: multi-episode model, `care_window_days`, drop `closed_at`).
+3. Redeploy **CDP UI 2026.06.18** (or later) in the same change window — clinician episode close/reopen and history UI depend on the new routes.
+4. Ensure **notification** is registered when **`RISK_ESCALATION_ENABLED`** is true (unchanged from v0.7.x).
+
+## Post-deploy verification
+
+1. `GET /health` returns `"status": "ok"` and `"version": "0.8.0"`.
+2. `SELECT version_num FROM alembic_version` reports **`011`**.
+3. Clinician JWT with `neosofia:tenant_uuid` can `GET /api/v1/care-episodes?tenant_uuid=<tenant>` and `PATCH /api/v1/care-episodes/{episode_uuid}` for a same-tenant patient; cross-tenant catalog or member access returns **403**.
+4. `GET /api/v1/care-episodes/{patient_uuid}/episodes` returns history with at most one `is_current` active row.
+
+## Evidence
+
+- Health version **0.8.0**; migration **011** applied; Cedar `authorization.allowed` logs show matching `tenant_uuid` on catalog and member routes.
+
+---
+
 # Installation Plan — care-episode v0.7.2
 
 Per-version deploy and verification steps for operators.
@@ -33,7 +57,7 @@ Per-version deploy and verification steps for operators.
 ## Post-deploy verification
 
 1. `GET /health` returns `"status": "ok"` and `"version": "0.7.1"`.
-2. Demo workspace bootstrap completes `POST /api/v1/care-episodes/recoveries` for the signed-in demo user (201, not 403).
+2. Demo workspace bootstrap completes `POST /api/v1/care-episodes` for the signed-in demo user (201, not 403).
 
 ## Evidence
 

@@ -2,6 +2,7 @@ import json
 import pytest
 import base64
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from jsonschema import validate
@@ -55,6 +56,21 @@ def app():
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def _mock_auth_loader_db():
+    """Prevent auth resource loaders from opening a real DB during route tests."""
+    mock_db = MagicMock()
+    mock_session = MagicMock()
+    mock_session.__enter__.return_value = mock_db
+    mock_session.__exit__.return_value = False
+    with (
+        patch("src.services.care_episode_service.SessionLocal", return_value=mock_session),
+        patch("src.services.care_episode_service.get_current_episode", return_value=None),
+        patch("src.services.care_episode_service.get_episode_row", return_value=None),
+    ):
+        yield mock_db
 
 
 @pytest.fixture

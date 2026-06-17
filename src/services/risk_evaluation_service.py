@@ -8,7 +8,7 @@ from werkzeug.exceptions import BadGateway, ServiceUnavailable
 from src.bootstrap.config import settings
 from src.bootstrap.request_telemetry import log_request_handled
 from src.clients import notification_client
-from src.models.care_episode import CareEpisodeRecovery
+from src.models.care_episode import CareEpisode
 from src.models.risk import InteractionRiskState
 from src.services.chat_context import build_interaction_context, days_post_op_for
 from src.services.inference_health import risk_inference_configured
@@ -22,7 +22,7 @@ RISK_LEVEL_WHEN_INFERENCE_UNAVAILABLE = "failed-pending-review"
 
 
 def _stamp_system_service_actor_on_row(
-    audited_database_row: CareEpisodeRecovery | InteractionRiskState,
+    audited_database_row: CareEpisode | InteractionRiskState,
 ) -> None:
     audited_database_row.changed_by_uuid = SYSTEM_ACTOR_UUID
     audited_database_row.changed_by_type = SERVICE_ACTOR_TYPE
@@ -61,7 +61,7 @@ def _build_risk_evaluation_response(
 
 
 def _submit_high_risk_escalation_to_notification(
-    recovery: CareEpisodeRecovery,
+    episode: CareEpisode,
     *,
     chat_interaction_uuid: uuid.UUID,
     tenant_uuid: uuid.UUID,
@@ -73,12 +73,12 @@ def _submit_high_risk_escalation_to_notification(
 
     try:
         notification_client.submit_clinical_escalation(
-            patient_display_code=recovery.display_code,
-            patient_display_name=recovery.display_name,
-            procedure_name=recovery.surgery,
-            days_post_op=days_post_op_for(recovery),
+            patient_display_code=episode.display_code,
+            patient_display_name=episode.display_name,
+            procedure_name=episode.surgery,
+            days_post_op=days_post_op_for(episode),
             care_summary=care_summary,
-            patient_uuid=str(recovery.patient_uuid),
+            patient_uuid=str(episode.patient_uuid),
             tenant_uuid=str(tenant_uuid),
             chat_interaction_uuid=str(chat_interaction_uuid),
             message_uuid=str(chat_message_uuid),
@@ -94,16 +94,16 @@ def _submit_high_risk_escalation_to_notification(
 def update_risk_after_patient_chat_message(
     db,
     *,
-    recovery: CareEpisodeRecovery,
+    episode: CareEpisode,
     chat_interaction_uuid: str,
     message_uuid: str,
     patient_message: str,
     tenant_uuid: str | None = None,
 ) -> dict[str, Any]:
-    """Score one patient chat turn: refresh interaction summary and recovery risk level."""
+    """Score one patient chat turn: refresh interaction summary and episode risk level."""
     chat_message_uuid = uuid.UUID(str(message_uuid))
     parsed_chat_interaction_uuid = uuid.UUID(str(chat_interaction_uuid))
-    parsed_tenant_uuid = uuid.UUID(str(tenant_uuid or recovery.tenant_uuid))
+    parsed_tenant_uuid = uuid.UUID(str(tenant_uuid or episode.tenant_uuid))
 
     if not risk_inference_configured():
         log_request_handled(
@@ -119,14 +119,14 @@ def update_risk_after_patient_chat_message(
     interaction_risk_summary = _load_or_create_interaction_risk_summary_row(
         db,
         parsed_chat_interaction_uuid,
-        recovery.patient_uuid,
+        episode.patient_uuid,
     )
 
     risk_agent_episode_context = build_interaction_context(
-        recovery,
+        episode,
         tenant_uuid=str(parsed_tenant_uuid),
     )
-    risk_agent_episode_context["current_risk_level"] = recovery.risk_level or "low"
+    risk_agent_episode_context["current_risk_level"] = episode.risk_level or "low"
 
     try:
         risk_agent_result = RiskAgent.evaluate(
@@ -147,13 +147,13 @@ def update_risk_after_patient_chat_message(
 
     interaction_risk_summary.summary = risk_agent_result.summary
     _stamp_system_service_actor_on_row(interaction_risk_summary)
-    recovery.risk_level = risk_agent_result.risk_level
-    _stamp_system_service_actor_on_row(recovery)
+    episode.risk_level = risk_agent_result.risk_level
+    _stamp_system_service_actor_on_row(episode)
 
     clinician_escalation_submitted = False
     if risk_agent_result.risk_level == "high":
         clinician_escalation_submitted = _submit_high_risk_escalation_to_notification(
-            recovery,
+            episode,
             chat_interaction_uuid=parsed_chat_interaction_uuid,
             tenant_uuid=parsed_tenant_uuid,
             chat_message_uuid=chat_message_uuid,

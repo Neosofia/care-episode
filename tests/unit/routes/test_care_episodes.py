@@ -11,7 +11,7 @@ TENANT = "00000000-0000-7000-8000-000000000010"
 SUB = "00000000-0000-7000-8000-000000000003"
 
 
-def _token(rsa_keypair, *, actors: list[str], sub: str = SUB) -> str:
+def _token(rsa_keypair, *, actors: list[str], sub: str = SUB, tenant_uuid: str = TENANT) -> str:
     claims = {
         "sub": sub,
         "aud": "care-episode",
@@ -19,6 +19,7 @@ def _token(rsa_keypair, *, actors: list[str], sub: str = SUB) -> str:
         "iat": 1,
         "neosofia:actors": actors,
         "neosofia:tenant_type": "platform",
+        "neosofia:tenant_uuid": tenant_uuid,
     }
     return jwt.encode(claims, rsa_keypair["private"], algorithm="RS256")
 
@@ -33,8 +34,8 @@ def _auth_headers(
     return {"Authorization": f"Bearer {_token(rsa_keypair, actors=actors, sub=sub)}"}
 
 
-def test_get_recoveries_requires_auth(client):
-    response = client.get("/api/v1/care-episodes/recoveries", base_url="https://localhost")
+def test_get_care_episodes_requires_auth(client):
+    response = client.get("/api/v1/care-episodes", base_url="https://localhost")
     assert response.status_code == 401
 
 
@@ -100,12 +101,12 @@ def _recovery_payload(*, patient_uuid: str = SUB) -> dict:
     }
 
 
-@patch("src.routes.care_episodes.upsert_recovery", return_value={"patient_uuid": SUB})
+@patch("src.routes.care_episodes.upsert_episode", return_value={"patient_uuid": SUB})
 @patch("src.routes.care_episodes.SessionLocal")
-def test_post_recovery_allows_demo_self(mock_session, mock_upsert, client, rsa_keypair):
+def test_post_care_episode_allows_demo_self(mock_session, mock_upsert, client, rsa_keypair):
     mock_session.return_value.__enter__.return_value = MagicMock()
     response = client.post(
-        "/api/v1/care-episodes/recoveries",
+        "/api/v1/care-episodes",
         json=_recovery_payload(patient_uuid=SUB),
         headers={
             **_auth_headers(rsa_keypair, actors=["demo"], sub=SUB),
@@ -117,12 +118,12 @@ def test_post_recovery_allows_demo_self(mock_session, mock_upsert, client, rsa_k
     mock_upsert.assert_called_once()
 
 
-@patch("src.routes.care_episodes.upsert_recovery")
+@patch("src.routes.care_episodes.upsert_episode")
 @patch("src.routes.care_episodes.SessionLocal")
-def test_post_recovery_forbidden_for_demo_other_patient(mock_session, mock_upsert, client, rsa_keypair):
+def test_post_care_episode_forbidden_for_demo_other_patient(mock_session, mock_upsert, client, rsa_keypair):
     mock_session.return_value.__enter__.return_value = MagicMock()
     response = client.post(
-        "/api/v1/care-episodes/recoveries",
+        "/api/v1/care-episodes",
         json=_recovery_payload(patient_uuid=PATIENT),
         headers={
             **_auth_headers(rsa_keypair, actors=["demo"], sub=SUB),
@@ -132,6 +133,123 @@ def test_post_recovery_forbidden_for_demo_other_patient(mock_session, mock_upser
     )
     assert response.status_code == 403
     mock_upsert.assert_not_called()
+
+
+EPISODE = str(uuid.uuid7())
+
+
+def _mock_episode_row():
+    row = MagicMock()
+    row.patient_uuid = uuid.UUID(PATIENT)
+    row.episode_uuid = uuid.UUID(EPISODE)
+    row.tenant_uuid = uuid.UUID(TENANT)
+    return row
+
+
+@patch("src.services.care_episode_service.get_current_episode", return_value=_mock_episode_row())
+@patch("src.services.care_episode_service.SessionLocal")
+@patch("src.routes.care_episodes.list_patient_episodes", return_value=[{"episode_uuid": str(uuid.uuid7()), "is_current": True}])
+@patch("src.routes.care_episodes.SessionLocal")
+def test_get_patient_episodes(mock_route_session, mock_history, mock_service_session, mock_current, client, rsa_keypair):
+    mock_route_session.return_value.__enter__.return_value = MagicMock()
+    mock_service_session.return_value.__enter__.return_value = MagicMock()
+    response = client.get(
+        f"/api/v1/care-episodes/{PATIENT}/episodes",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 200
+    assert response.get_json()["items"][0]["is_current"] is True
+    mock_history.assert_called_once()
+
+
+@patch("src.services.care_episode_service.get_episode_row", return_value=_mock_episode_row())
+@patch("src.services.care_episode_service.SessionLocal")
+@patch("src.routes.care_episodes.get_episode", return_value={"episode_uuid": EPISODE, "is_current": True})
+@patch("src.routes.care_episodes.SessionLocal")
+def test_get_episode_by_uuid(mock_route_session, mock_get, mock_service_session, mock_get_episode_row, client, rsa_keypair):
+    mock_route_session.return_value.__enter__.return_value = MagicMock()
+    mock_service_session.return_value.__enter__.return_value = MagicMock()
+    response = client.get(
+        f"/api/v1/care-episodes/{EPISODE}",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 200
+    assert response.get_json()["episode_uuid"] == EPISODE
+    assert mock_get_episode_row.call_count == 2
+    mock_get.assert_called_once()
+
+
+@patch("src.services.care_episode_service.get_episode_row", return_value=_mock_episode_row())
+@patch("src.services.care_episode_service.SessionLocal")
+@patch("src.routes.care_episodes.get_episode", return_value=None)
+@patch("src.routes.care_episodes.SessionLocal")
+def test_get_episode_by_uuid_not_found(mock_route_session, mock_get, mock_service_session, mock_get_episode_row, client, rsa_keypair):
+    mock_route_session.return_value.__enter__.return_value = MagicMock()
+    mock_service_session.return_value.__enter__.return_value = MagicMock()
+    response = client.get(
+        f"/api/v1/care-episodes/{EPISODE}",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 404
+    assert mock_get_episode_row.call_count == 2
+    mock_get.assert_called_once()
+
+
+@patch("src.services.care_episode_service.get_episode_row", return_value=_mock_episode_row())
+@patch("src.services.care_episode_service.SessionLocal")
+@patch("src.routes.care_episodes.patch_episode", return_value={"episode_uuid": EPISODE, "status": "closed"})
+@patch("src.routes.care_episodes.SessionLocal")
+def test_patch_episode_close(mock_route_session, mock_patch, mock_service_session, mock_get_episode_row, client, rsa_keypair):
+    mock_route_session.return_value.__enter__.return_value = MagicMock()
+    mock_service_session.return_value.__enter__.return_value = MagicMock()
+    response = client.patch(
+        f"/api/v1/care-episodes/{EPISODE}",
+        json={"status": "closed"},
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "closed"
+    assert mock_get_episode_row.call_count == 2
+    mock_patch.assert_called_once()
+
+
+@patch("src.services.care_episode_service.get_episode_row", return_value=_mock_episode_row())
+@patch("src.services.care_episode_service.SessionLocal")
+@patch("src.routes.care_episodes.patch_episode", return_value={"episode_uuid": EPISODE, "status": "active"})
+@patch("src.routes.care_episodes.SessionLocal")
+def test_patch_episode_reopen(mock_route_session, mock_patch, mock_service_session, mock_get_episode_row, client, rsa_keypair):
+    mock_route_session.return_value.__enter__.return_value = MagicMock()
+    mock_service_session.return_value.__enter__.return_value = MagicMock()
+    response = client.patch(
+        f"/api/v1/care-episodes/{EPISODE}",
+        json={"status": "active"},
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "active"
+    assert mock_get_episode_row.call_count == 2
+    mock_patch.assert_called_once()
+
+
+@patch("src.routes.care_episodes.start_new_episode", return_value={"patient_uuid": PATIENT, "status": "active"})
+@patch("src.routes.care_episodes.SessionLocal")
+def test_post_start_episode(mock_session, mock_start, client, rsa_keypair):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    payload = _recovery_payload(patient_uuid=PATIENT)
+    del payload["patient_uuid"]
+    response = client.post(
+        f"/api/v1/care-episodes/{PATIENT}/episodes",
+        json=payload,
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 201
+    mock_start.assert_called_once()
 
 
 def test_study_actor_forbidden_on_patient_write(client, rsa_keypair):

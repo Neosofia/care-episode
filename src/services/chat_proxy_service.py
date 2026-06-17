@@ -5,11 +5,14 @@ from typing import Any
 
 from authorization_in_the_middle.flask_identity import jwt_claim_principal_attributes
 from flask import g, has_request_context
-from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import Conflict, NotFound
 
 from src.clients import chat_client
-from src.models.care_episode import CareEpisodeRecovery
-from src.services.care_episode_service import _default_last_activity
+from src.models.care_episode import EPISODE_STATUS_ACTIVE, CareEpisode
+from src.services.care_episode_service import (
+    _default_last_activity,
+    get_active_episode,
+)
 from src.services.chat_context import build_interaction_context
 from src.services.risk_evaluation_service import update_risk_after_patient_chat_message
 
@@ -24,25 +27,31 @@ def _jwt_tenant_uuid() -> str:
     return str(attrs.get("tenantId") or "").strip()
 
 
-def require_recovery(db, patient_uuid: str) -> CareEpisodeRecovery:
-    patient_id = uuid.UUID(str(patient_uuid))
-    recovery = db.get(CareEpisodeRecovery, patient_id)
-    if recovery is None:
-        raise NotFound("care episode recovery not found")
-    return recovery
+def require_episode(db, patient_uuid: str) -> CareEpisode:
+    episode = get_active_episode(db, patient_uuid)
+    if episode is None:
+        raise NotFound("care episode not found")
+    return episode
+
+
+def require_active_episode(db, patient_uuid: str) -> CareEpisode:
+    episode = require_episode(db, patient_uuid)
+    if episode.status != EPISODE_STATUS_ACTIVE:
+        raise Conflict("care episode is closed")
+    return episode
 
 
 def create_chat_interaction(db, patient_uuid: str) -> dict[str, Any]:
-    recovery = require_recovery(db, patient_uuid)
-    context = build_interaction_context(recovery, tenant_uuid=_jwt_tenant_uuid())
+    episode = require_active_episode(db, patient_uuid)
+    context = build_interaction_context(episode, tenant_uuid=_jwt_tenant_uuid())
     interaction = chat_client.create_interaction(patient_uuid, context=context)
-    return {**interaction, "care_episode_uuid": patient_uuid}
+    return {**interaction, "care_episode_uuid": str(episode.episode_uuid)}
 
 
 def _maybe_evaluate_risk(
     db,
     *,
-    recovery: CareEpisodeRecovery,
+    episode: CareEpisode,
     patient_uuid: str,
     chat_interaction_uuid: str,
     payload: dict[str, Any],
@@ -59,7 +68,7 @@ def _maybe_evaluate_risk(
 
     return update_risk_after_patient_chat_message(
         db,
-        recovery=recovery,
+        episode=episode,
         chat_interaction_uuid=chat_interaction_uuid,
         message_uuid=str(message_uuid),
         patient_message=content,
@@ -73,12 +82,12 @@ def proxy_chat_completion(
     chat_interaction_uuid: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    recovery = require_recovery(db, patient_uuid)
+    episode = require_active_episode(db, patient_uuid)
     result = chat_client.create_completion(patient_uuid, chat_interaction_uuid, payload)
 
     risk_outcome = _maybe_evaluate_risk(
         db,
-        recovery=recovery,
+        episode=episode,
         patient_uuid=patient_uuid,
         chat_interaction_uuid=chat_interaction_uuid,
         payload=payload,
@@ -88,7 +97,7 @@ def proxy_chat_completion(
         result["risk_evaluation"] = risk_outcome
 
     if payload.get("content") or payload.get("session_start"):
-        row = db.get(CareEpisodeRecovery, uuid.UUID(str(patient_uuid)))
+        row = get_active_episode(db, patient_uuid)
         if row is not None:
             row.last_activity = _default_last_activity()
             db.commit()

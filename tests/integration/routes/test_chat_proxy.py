@@ -29,17 +29,20 @@ def _auth_headers(rsa_keypair, *, actors: list[str] | None = None, sub: str = SU
     return {"Authorization": f"Bearer {_token(rsa_keypair, actors=actors, sub=sub)}"}
 
 
-def _recovery_row():
-    from src.models.care_episode import CareEpisodeRecovery
+def _episode_row():
+    from src.models.care_episode import CareEpisode
 
-    return CareEpisodeRecovery(
+    return CareEpisode(
+        episode_uuid=uuid.UUID("00000000-0000-7000-8000-000000000099"),
         patient_uuid=uuid.UUID(PATIENT),
         display_code="PT-001",
         display_name="Alex Patient",
         surgery="Knee scope",
         procedure_date=datetime.date.today(),
         recovery_id="sess-1",
+        last_activity="2026-06-11T12:00:00Z",
         risk_level="low",
+        status="active",
         tenant_uuid=uuid.UUID("00000000-0000-7000-8000-000000000010"),
         changed_by_uuid=uuid.UUID("00000000-0000-7000-8000-000000000000"),
         changed_by_type=2,
@@ -47,11 +50,12 @@ def _recovery_row():
 
 
 @patch("src.clients.chat_client.create_interaction")
+@patch("src.services.chat_proxy_service.get_active_episode")
 @patch("src.routes.care_episodes.SessionLocal")
-def test_chat_interaction_create_happy_path(mock_session, mock_create_interaction, client, rsa_keypair, api_spec, validate_response):
-    db = MagicMock()
-    db.get.return_value = _recovery_row()
-    mock_session.return_value.__enter__.return_value = db
+def test_chat_interaction_create_happy_path(mock_session, mock_active_episode, mock_create_interaction, client, rsa_keypair, api_spec, validate_response):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    episode = _episode_row()
+    mock_active_episode.return_value = episode
     mock_create_interaction.return_value = {
         "chat_interaction_uuid": INTERACTION,
         "user_uuid": PATIENT,
@@ -67,17 +71,16 @@ def test_chat_interaction_create_happy_path(mock_session, mock_create_interactio
     assert response.status_code == 201
     body = response.get_json()
     assert body["chat_interaction_uuid"] == INTERACTION
-    assert body["care_episode_uuid"] == PATIENT
+    assert body["care_episode_uuid"] == str(episode.episode_uuid)
     mock_create_interaction.assert_called_once()
     validate_response(api_spec, endpoint, "post", 201, body)
 
 
 @patch("src.clients.chat_client.create_interaction")
+@patch("src.services.chat_proxy_service.get_active_episode", return_value=None)
 @patch("src.routes.care_episodes.SessionLocal")
-def test_chat_interaction_create_no_recovery_skips_chat_call(mock_session, mock_create_interaction, client, rsa_keypair):
-    db = MagicMock()
-    db.get.return_value = None
-    mock_session.return_value.__enter__.return_value = db
+def test_chat_interaction_create_no_episode_skips_chat_call(mock_session, _mock_active, mock_create_interaction, client, rsa_keypair):
+    mock_session.return_value.__enter__.return_value = MagicMock()
 
     response = client.post(
         f"/api/v1/care-episodes/{PATIENT}/chat/interactions",
