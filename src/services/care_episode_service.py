@@ -217,15 +217,6 @@ def patient_records(db, patient_uuid: str) -> list[dict]:
     ]
 
 
-def create_episode_invite(payload: dict) -> dict:
-    patient_uuid = str(uuid.UUID(str(payload["patient_uuid"])))
-    return {
-        "episode_uuid": str(uuid.uuid7()),
-        "invite_token": f"episode_{uuid.uuid4().hex}",
-        "patient_uuid": patient_uuid,
-    }
-
-
 def _apply_episode_payload(
     episode: CareEpisode,
     payload: dict,

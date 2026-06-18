@@ -333,63 +333,6 @@
         }
       }
     },
-    "/api/v1/care-episodes/invites": {
-      "post": {
-        "operationId": "createCareEpisodeInvite",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateInviteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Invite created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateInviteResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/care-episodes/{patient_uuid}/records": {
       "get": {
         "operationId": "listCareEpisodeRecords",
@@ -1452,44 +1395,6 @@
           },
           "count": {
             "type": "integer"
-          }
-        }
-      },
-      "CreateInviteRequest": {
-        "type": "object",
-        "required": [
-          "patient_uuid",
-          "procedure_type",
-          "care_window_days"
-        ],
-        "properties": {
-          "patient_uuid": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "procedure_type": {
-            "type": "string"
-          },
-          "care_window_days": {
-            "type": "integer"
-          },
-          "emr_procedure_ref": {
-            "type": "string"
-          }
-        }
-      },
-      "CreateInviteResponse": {
-        "type": "object",
-        "required": [
-          "episode_uuid"
-        ],
-        "properties": {
-          "episode_uuid": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "invite_token": {
-            "type": "string"
           }
         }
       },

@@ -2,16 +2,18 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.9.0] - 2026-06-18
+
+### Removed
+
+- Unused invite enrollment API; CDP enroll flow is unchanged for clinicians and patients.
+
 ## [0.8.2] - 2026-06-20
 
 ### Changed
 
-- **Clinical risk alert email** — escalation notifications contain a deep link to the clinician patient record only (`patient_uuid` + `episode_uuid` query param). No PHI/PII in subject or body.
-- **Chat interaction context** — optional `patient_display_name` on create-interaction and completion proxy requests; merged into interaction context for greeting. User service label lookup removed.
-
-### Removed
-
-- **`user_client`** — care-episode no longer calls User to resolve patient display names.
+- Clinical risk alert emails link clinicians straight to the patient record in CDP; subject and body no longer include patient names or chat message text.
+- Patient chat greetings can use the display name the calling application supplies when starting or continuing a conversation.
 
 ## [0.8.1] - 2026-06-19
 

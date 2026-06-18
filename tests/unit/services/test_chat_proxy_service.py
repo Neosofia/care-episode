@@ -6,7 +6,11 @@ from flask import Flask, g
 from werkzeug.exceptions import NotFound
 
 from src.models.care_episode import CareEpisode
-from src.services.chat_proxy_service import create_chat_interaction, proxy_chat_completion, require_episode
+from src.services.chat_proxy_service import (
+    create_chat_interaction,
+    proxy_chat_completion,
+    require_episode,
+)
 
 pytestmark = pytest.mark.unit
 

@@ -39,27 +39,6 @@ def test_get_care_episodes_requires_auth(client):
     assert response.status_code == 401
 
 
-def test_post_invite_requires_fields(client, rsa_keypair):
-    response = client.post(
-        "/api/v1/care-episodes/invites",
-        json={},
-        headers=_auth_headers(rsa_keypair),
-        base_url="https://localhost",
-    )
-    assert response.status_code == 400
-
-
-def test_post_invite_returns_token(client, rsa_keypair):
-    response = client.post(
-        "/api/v1/care-episodes/invites",
-        json={"patient_uuid": PATIENT, "procedure_type": "scope", "care_window_days": 14},
-        headers=_auth_headers(rsa_keypair),
-        base_url="https://localhost",
-    )
-    assert response.status_code == 201
-    assert response.get_json()["invite_token"].startswith("episode_")
-
-
 @patch("src.routes.care_episodes.mark_inbox_message_read", return_value={"id": "m1", "read_at": "2026-01-01T00:00:00+00:00"})
 @patch("src.routes.care_episodes.SessionLocal")
 def test_patch_message_read(mock_session, mock_mark, client, rsa_keypair):

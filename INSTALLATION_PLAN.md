@@ -1,182 +1,191 @@
-# Installation Plan — care-episode v0.8.2
+# Product Installation Plan
 
-Per-version deploy and verification steps for operators.
+Per-version deploy steps for operators. User-visible changes: [CHANGELOG.md](CHANGELOG.md).
 
-## Deploy steps
+## care-episode v0.9.0
 
-1. Pull image `ghcr.io/neosofia/care-episode:v0.8.2` (tag `care-episode/v0.8.2`).
-2. No new migrations (head remains revision **`012`**).
-3. Set **`FRONTEND_URL`** to the CDP UI base URL (used for clinical risk alert deep links).
-4. Redeploy **CDP UI 2026.06.20** (or later) in the same change window — UI sends optional `patient_display_name` for chat greeting and reads `episode_uuid` from escalation deep links.
+**Image:** `ghcr.io/neosofia/care-episode:v0.9.0` (tag `care-episode/v0.9.0`)
 
-## Post-deploy verification
+**Deploy:**
 
-1. `GET /health` returns `"status": "ok"` and `"version": "0.8.2"`.
-2. `SELECT version_num FROM alembic_version` reports **`012`**.
-3. High-risk chat completion triggers a clinical alert email whose body contains only a deep link (`/clinician/patients/{patient_uuid}?episode_uuid={episode_uuid}`) — no patient names or message content.
-4. Patient chat greeting uses `patient_display_name` from the client when supplied.
+1. Redeploy **care-episode v0.9.0** (no new migration; head **`012`**).
+2. Redeploy **CDP UI 2026.06.21** or later in the same change window.
 
-## Evidence
+**Verify:**
 
-- Health version **0.8.2**; migration **012** unchanged; staging E2E green.
+- `GET /health` → `"version": "0.9.0"`.
+- `alembic_version` is **`012`**.
+- Clinician **Enroll** still creates patients and opens post-care monitoring in CDP.
+- Patient chat and episode lifecycle (close, reopen, new episode) unchanged.
 
----
-
-# Installation Plan — care-episode v0.8.1
-
-Per-version deploy and verification steps for operators.
-
-## Deploy steps
-
-1. Pull image `ghcr.io/neosofia/care-episode:v0.8.1` (tag `care-episode/v0.8.1`).
-2. Run migrations to head (revision **`012`**: drop denormalized patient labels from recoveries).
-3. Redeploy **CDP UI 2026.06.19** (or later) in the same change window — UI no longer sends patient labels on care-episode upsert/start.
-4. Ensure **user** is registered and reachable from care-episode mesh (chat proxy and risk escalation resolve patient labels via `GET /api/v1/users/{uuid}`).
-
-## Post-deploy verification
-
-1. `GET /health` returns `"status": "ok"` and `"version": "0.8.1"`.
-2. `SELECT version_num FROM alembic_version` reports **`012`**.
-3. `GET /api/v1/care-episodes?tenant_uuid=<tenant>` episode objects omit `display_code` and `display_name`; roster labels come from User registry in the UI.
-4. Patient chat completion still succeeds (User profile fetched for interaction context).
-
-## Evidence
-
-- Health version **0.8.1**; migration **012** applied; staging E2E close/reopen passes for **DEMO-123**.
+**Evidence:** Health JSON version field; staging E2E and visual walkthrough green.
 
 ---
 
-# Installation Plan — care-episode v0.8.0
+## care-episode v0.8.2
 
-Per-version deploy and verification steps for operators.
+**Image:** `ghcr.io/neosofia/care-episode:v0.8.2` (tag `care-episode/v0.8.2`)
 
-## Deploy steps
+**Deploy:**
 
-1. Pull image `ghcr.io/neosofia/care-episode:v0.8.0` (tag `care-episode/v0.8.0`).
-2. Run migrations to head (revisions **`009`**–**`011`**: multi-episode model, `care_window_days`, drop `closed_at`).
-3. Redeploy **CDP UI 2026.06.18** (or later) in the same change window — clinician episode close/reopen and history UI depend on the new routes.
-4. Ensure **notification** is registered when **`RISK_ESCALATION_ENABLED`** is true (unchanged from v0.7.x).
+1. Redeploy **care-episode v0.8.2** (no new migration; head **`012`**).
+2. Set **`FRONTEND_URL`** to the CDP UI base URL (clinical risk alert deep links).
+3. Redeploy **CDP UI 2026.06.20** or later in the same change window.
 
-## Post-deploy verification
+**Verify:**
 
-1. `GET /health` returns `"status": "ok"` and `"version": "0.8.0"`.
-2. `SELECT version_num FROM alembic_version` reports **`011`**.
-3. Clinician JWT with `neosofia:tenant_uuid` can `GET /api/v1/care-episodes?tenant_uuid=<tenant>` and `PATCH /api/v1/care-episodes/{episode_uuid}` for a same-tenant patient; cross-tenant catalog or member access returns **403**.
-4. `GET /api/v1/care-episodes/{patient_uuid}/episodes` returns history with at most one `is_current` active row.
+- `GET /health` → `"version": "0.8.2"`.
+- `alembic_version` is **`012`**.
+- High-risk patient chat triggers a clinical alert email whose body is a deep link only (no patient names or message text).
+- Patient chat greeting reflects the display name supplied by the client.
 
-## Evidence
-
-- Health version **0.8.0**; migration **011** applied; Cedar `authorization.allowed` logs show matching `tenant_uuid` on catalog and member routes.
+**Evidence:** Health JSON version field; staging E2E green.
 
 ---
 
-# Installation Plan — care-episode v0.7.2
+## care-episode v0.8.1
 
-Per-version deploy and verification steps for operators.
+**Image:** `ghcr.io/neosofia/care-episode:v0.8.1` (tag `care-episode/v0.8.1`)
 
-## Deploy steps
+**Deploy:**
 
-1. Pull image `ghcr.io/neosofia/care-episode:v0.7.2` (tag `care-episode/v0.7.2`).
-2. No new migrations.
-3. Ensure **notification** is registered in the service registry (`slug: notification`) when **`RISK_ESCALATION_ENABLED`** is true (default).
-4. Optional: set **`CLINICAL_RISK_ALERT_FROM_EMAIL`** (default `care-episode-alerts@neosofia.tech`).
-5. Review gunicorn and upstream timeout env vars if overridden locally (defaults: **`WEB_CONCURRENCY=1`**, **`GUNICORN_THREADS=32`**, **`GUNICORN_TIMEOUT=15`**; mesh hops **`CHAT_SERVICE_TIMEOUT_SECONDS`**, **`INFERENCE_TIMEOUT_SECONDS`**, **`NOTIFICATION_SERVICE_TIMEOUT_SECONDS`**, **`AUTHENTICATION_TOKEN_TIMEOUT_SECONDS`** default **10**).
+1. Redeploy **care-episode v0.8.1** (migration **`012`**: drop denormalized patient labels from recoveries).
+2. Redeploy **CDP UI 2026.06.19** or later in the same change window.
 
-## Post-deploy verification
+**Verify:**
 
-1. `GET /health` returns `"status": "ok"` and `"version": "0.7.2"`.
-2. High-risk chat completion triggers a clinical alert email via notification (`POST /api/emails`) when escalation is enabled.
+- `GET /health` → `"version": "0.8.1"`.
+- `alembic_version` is **`012`**.
+- Episode API payloads omit `display_code` and `display_name`; roster labels come from the User registry in the UI.
+- Patient chat completion still succeeds.
 
-## Evidence
-
-- Health version **0.7.2**; structured logs show successful chat proxy and risk evaluation outcomes.
+**Evidence:** Health JSON version field; staging E2E close/reopen for **DEMO-123**.
 
 ---
 
-# Installation Plan — care-episode v0.7.1
+## care-episode v0.8.0
 
-Per-version deploy and verification steps for operators.
+**Image:** `ghcr.io/neosofia/care-episode:v0.8.0` (tag `care-episode/v0.8.0`)
 
-## Deploy steps
+**Deploy:**
 
-1. Pull image `ghcr.io/neosofia/care-episode:v0.7.1` (tag `care-episode/v0.7.1`).
-2. No new migrations or env vars.
+1. Redeploy **care-episode v0.8.0** (migrations **`009`**–**`011`**: multi-episode model, `care_window_days`, drop `closed_at`).
+2. Redeploy **CDP UI 2026.06.18** or later in the same change window.
+3. Ensure **notification** is registered when **`RISK_ESCALATION_ENABLED`** is true.
 
-## Post-deploy verification
+**Verify:**
 
-1. `GET /health` returns `"status": "ok"` and `"version": "0.7.1"`.
-2. Demo workspace bootstrap completes `POST /api/v1/care-episodes` for the signed-in demo user (201, not 403).
+- `GET /health` → `"version": "0.8.0"`.
+- `alembic_version` is **`011`**.
+- Clinician JWT with `neosofia:tenant_uuid` can list and patch same-tenant episodes; cross-tenant access returns **403**.
+- `GET /api/v1/care-episodes/{patient_uuid}/episodes` returns history with at most one `is_current` active row.
 
-## Evidence
-
-- Health version **0.7.1**; demo bootstrap recovery create succeeds on staging.
-
----
-
-# Installation Plan — care-episode v0.7.0
-
-Per-version deploy and verification steps for operators.
-
-## Deploy steps
-
-1. Pull image `ghcr.io/neosofia/care-episode:v0.7.0` (tag `care-episode/v0.7.0`).
-2. No new migrations or env vars (SDK **`authorization-in-the-middle/v0.7.1`** only).
-
-## Post-deploy verification
-
-1. `GET /health` returns `"status": "ok"` and `"version": "0.7.0"`.
-2. Chat proxy interaction create and completion proxy smoke checks pass.
-
-## Evidence
-
-- Health version **0.7.0**; structured logs show successful chat proxy outcomes.
+**Evidence:** Health JSON version field; Cedar logs show matching `tenant_uuid` on catalog and member routes.
 
 ---
 
-# Installation Plan — care-episode v0.6.0
+## care-episode v0.7.2
 
-Per-version deploy and verification steps for operators.
+**Image:** `ghcr.io/neosofia/care-episode:v0.7.2` (tag `care-episode/v0.7.2`)
 
-## Deploy steps
+**Deploy:**
 
-1. Pull image `ghcr.io/neosofia/care-episode:v0.6.0` (tag `care-episode/v0.6.0`).
-2. Run migrations to head (revision **`008`** — `interaction_risk_states`; risk level on `care_episode_recoveries`).
-3. Set **`INFERENCE_COMPLETIONS_URL`**, **`INFERENCE_API_KEY`**, and **`INFERENCE_MODEL`** for clinical risk evaluation (same gateway pattern as Chat inference).
-4. Keep **`CARE_EPISODE_CLIENT_SECRET`** and Chat registry entry from prior releases.
-5. Optional: set **`RISK_ESCALATION_ENABLED=false`** to disable high-risk email alerts. Ensure **notification** is registered in the service registry (`slug: notification`) so CE can reach `POST /api/emails`.
+1. Redeploy **care-episode v0.7.2** (no new migrations).
+2. Ensure **notification** is registered (`slug: notification`) when **`RISK_ESCALATION_ENABLED`** is true (default).
+3. Optional: set **`CLINICAL_RISK_ALERT_FROM_EMAIL`** (default `care-episode-alerts@neosofia.tech`).
 
-## Post-deploy verification
+**Verify:**
 
-1. `GET /health` returns `"status": "ok"` and `"version": "0.6.0"`.
-2. Patient content completion → **200** with Chat reply and `risk_evaluation` object (`risk_level`, `escalated`).
-3. `session_start` completion → **200** without `risk_evaluation`.
-4. With inference env unset, content completion → `risk_evaluation.risk_level` is `failed-pending-review`.
+- `GET /health` → `"version": "0.7.2"`.
+- High-risk chat completion triggers a clinical alert email via notification when escalation is enabled.
 
-## Evidence
+**Evidence:** Health JSON version field; structured logs show successful chat proxy and risk evaluation outcomes.
 
-- Health version matches `0.6.0`.
-- Migration `008` applied.
-- Structured logs show `risk_evaluation` / `risk_escalation` events (outcome only; no PHI).
+---
+
+## care-episode v0.7.1
+
+**Image:** `ghcr.io/neosofia/care-episode:v0.7.1` (tag `care-episode/v0.7.1`)
+
+**Deploy:**
+
+1. Redeploy **care-episode v0.7.1** (no new migrations or env vars).
+
+**Verify:**
+
+- `GET /health` → `"version": "0.7.1"`.
+- Demo workspace bootstrap completes `POST /api/v1/care-episodes` for the signed-in demo user (201, not 403).
+
+**Evidence:** Health JSON version field; demo bootstrap recovery create succeeds on staging.
+
+---
+
+## care-episode v0.7.0
+
+**Image:** `ghcr.io/neosofia/care-episode:v0.7.0` (tag `care-episode/v0.7.0`)
+
+**Deploy:**
+
+1. Redeploy **care-episode v0.7.0** (SDK **`authorization-in-the-middle/v0.7.1`** only; no new migrations).
+
+**Verify:**
+
+- `GET /health` → `"version": "0.7.0"`.
+- Chat proxy interaction create and completion proxy smoke checks pass.
+
+**Evidence:** Health JSON version field; structured logs show successful chat proxy outcomes.
+
+---
+
+## care-episode v0.6.0
+
+**Image:** `ghcr.io/neosofia/care-episode:v0.6.0` (tag `care-episode/v0.6.0`)
+
+**Deploy:**
+
+1. Redeploy **care-episode v0.6.0** (migration **`008`** — `interaction_risk_states`; risk level on recoveries).
+2. Set **`INFERENCE_COMPLETIONS_URL`**, **`INFERENCE_API_KEY`**, and **`INFERENCE_MODEL`** for clinical risk evaluation.
+3. Keep **`CARE_EPISODE_CLIENT_SECRET`** and Chat registry entry from prior releases.
+4. Optional: set **`RISK_ESCALATION_ENABLED=false`** to disable high-risk email alerts.
+
+**Verify:**
+
+- `GET /health` → `"version": "0.6.0"**.
+- Patient content completion → **200** with Chat reply and `risk_evaluation` object.
+- `session_start` completion → **200** without `risk_evaluation`.
+- With inference env unset, content completion → `risk_evaluation.risk_level` is `failed-pending-review`.
+
+**Evidence:** Health JSON version field; migration **`008`** applied.
 
 ---
 
 ## care-episode v0.5.0
 
-1. Pull image `ghcr.io/neosofia/care-episode:v0.5.0` (tag `care-episode/v0.5.0`).
-2. Deploy **chat v0.5.0** in the same change window (CE proxy depends on CE-only interaction create).
-3. Set **`CARE_EPISODE_CLIENT_SECRET`** (client credentials for `care-episode` → authentication token exchange).
-4. Ensure **Chat** is registered in the authentication service registry (`slug: chat`) with a reachable `base_url`.
-5. Keep existing database URLs, JWT, and Cedar settings unless your environment customizes them.
-6. Run migration **`006`** if upgrading from v0.4.0 (recovery rename).
+**Image:** `ghcr.io/neosofia/care-episode:v0.5.0` (tag `care-episode/v0.5.0`)
 
-**Verify:** `GET /health` → `"version": "0.5.0"`; chat interaction create and completion proxy smoke checks pass.
+**Deploy:**
+
+1. Deploy **chat v0.5.0** in the same change window.
+2. Set **`CARE_EPISODE_CLIENT_SECRET`** (client credentials for care-episode → authentication token exchange).
+3. Ensure **Chat** is registered in the authentication service registry (`slug: chat`).
+4. Run migration **`006`** if upgrading from v0.4.0.
+
+**Verify:**
+
+- `GET /health` → `"version": "0.5.0"`.
+- Chat interaction create and completion proxy smoke checks pass.
 
 ---
 
 ## care-episode v0.3.0
 
-1. Pull image `ghcr.io/neosofia/care-episode:v0.3.0` (tag `care-episode/v0.3.0`).
-2. Deploy with existing env unchanged (SDK **`authorization-in-the-middle/v0.4.23`** baked into the image).
-3. No new migrations in this release.
+**Image:** `ghcr.io/neosofia/care-episode:v0.3.0` (tag `care-episode/v0.3.0`)
 
-**Verify:** `GET /health` → `"version": "0.3.0"`; recovery list and invite smoke checks pass.
+**Deploy:**
+
+1. Redeploy **care-episode v0.3.0** (SDK **`authorization-in-the-middle/v0.4.23`** baked into the image; no new migrations).
+
+**Verify:**
+
+- `GET /health` → `"version": "0.3.0"`.
+- Recovery list and invite smoke checks pass.

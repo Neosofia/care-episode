@@ -20,7 +20,6 @@ from src.bootstrap.request_telemetry import log_request_handled
 from src.db.engine import SessionLocal
 from src.services.care_episode_service import (
     bulk_close_episodes,
-    create_episode_invite,
     get_episode,
     list_episodes,
     list_patient_episodes,
@@ -37,7 +36,10 @@ from src.services.care_episode_service import (
     start_new_episode,
     upsert_episode,
 )
-from src.services.chat_proxy_service import create_chat_interaction, proxy_chat_completion
+from src.services.chat_proxy_service import (
+    create_chat_interaction,
+    proxy_chat_completion,
+)
 
 bp = Blueprint("care-episodes", __name__, url_prefix="/api/v1/care-episodes")
 
@@ -321,22 +323,6 @@ def post_messages(patient_uuid: str) -> Response:
             changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"),
         )
     return jsonify(item), 201
-
-
-@bp.post("/invites")
-@with_security(
-    action='Action::"care-episode:create"',
-    rate_limit=settings.care_episode_write_rate_limit,
-    catalog_attrs=_principal_tenant_catalog_attrs,
-)
-def post_invite() -> Response:
-    payload = request.get_json(silent=True) or {}
-    required = ("patient_uuid", "procedure_type", "care_window_days")
-    missing = [field for field in required if payload.get(field) in (None, "")]
-    if missing:
-        raise BadRequest(f"missing required fields: {missing}")
-    item = create_episode_invite(payload)
-    return jsonify({"episode_uuid": item["episode_uuid"], "invite_token": item["invite_token"]}), 201
 
 
 @bp.post("")

@@ -19,7 +19,20 @@ def test_openapi_spec_contains_core_paths():
         "/api/v1/care-episodes/{patient_uuid}/chat/interactions/{chat_interaction_uuid}/completions"
         in spec["paths"]
     )
+    assert (
+        "/api/v1/care-episodes/{patient_uuid}/chat/interactions/{chat_interaction_uuid}/messages"
+        not in spec["paths"]
+    )
+    chat_interactions = spec["paths"]["/api/v1/care-episodes/{patient_uuid}/chat/interactions"]
+    assert set(chat_interactions) == {"post"}
     assert "/api/v1/care-episodes/{patient_uuid}/transcript" not in spec["paths"]
+    for schema in (
+        "ChatInteractionListResponse",
+        "ChatInteractionSummary",
+        "ChatMessageListResponse",
+        "ChatMessageSummary",
+    ):
+        assert schema not in spec["components"]["schemas"]
     assert spec["info"]["version"] == "0.6.0"
 
 

@@ -101,3 +101,4 @@ def test_chat_interaction_create_no_episode_skips_chat_call(mock_session, _mock_
 
     assert response.status_code == 404
     mock_create_interaction.assert_not_called()
+
