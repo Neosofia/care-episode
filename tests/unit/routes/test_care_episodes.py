@@ -17,6 +17,7 @@ def _token(rsa_keypair, *, actors: list[str], sub: str = SUB, tenant_uuid: str =
         "aud": "care-episode",
         "exp": 9999999999,
         "iat": 1,
+        "neosofia:token_type": "human",
         "neosofia:actors": actors,
         "neosofia:tenant_type": "platform",
         "neosofia:tenant_uuid": tenant_uuid,
@@ -51,7 +52,10 @@ def test_patch_message_read(mock_session, mock_mark, client, rsa_keypair):
         base_url="https://localhost",
     )
     assert response.status_code == 200
-    mock_mark.assert_called_once_with(mock_session.return_value.__enter__.return_value, SUB, message_id, changed_by_uuid=SUB)
+    mock_mark.assert_called_once()
+    _, kwargs = mock_mark.call_args
+    assert kwargs["changed_by_uuid"] == SUB
+    assert kwargs["changed_by_type"] == 1
 
 
 @patch("src.routes.care_episodes.mark_inbox_message_read", return_value=None)
@@ -213,6 +217,27 @@ def test_patch_episode_reopen(mock_route_session, mock_patch, mock_service_sessi
     mock_patch.assert_called_once()
 
 
+@patch("src.services.care_episode_service.get_episode_row", return_value=_mock_episode_row())
+@patch("src.services.care_episode_service.SessionLocal")
+def test_patch_episode_rejects_forged_audit_attribution(
+    mock_service_session,
+    mock_get_episode_row,
+    client,
+    rsa_keypair,
+):
+    mock_service_session.return_value.__enter__.return_value = MagicMock()
+    response = client.patch(
+        f"/api/v1/care-episodes/{EPISODE}",
+        json={"status": "closed", "changed_by_uuid": str(uuid.uuid4())},
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 400
+    body = response.get_json(silent=True) or {}
+    error_text = str(body)
+    assert body.get("error") == "invalid_request" or "audit attribution" in error_text
+
+
 @patch("src.routes.care_episodes.start_new_episode", return_value={"patient_uuid": PATIENT, "status": "active"})
 @patch("src.routes.care_episodes.SessionLocal")
 def test_post_start_episode(mock_session, mock_start, client, rsa_keypair):
@@ -240,3 +265,43 @@ def test_study_actor_forbidden_on_patient_write(client, rsa_keypair):
         base_url="https://localhost",
     )
     assert response.status_code == 403
+
+
+@patch("src.services.care_episode_service.get_current_episode", return_value=_mock_episode_row())
+@patch("src.routes.care_episodes.get_patient_audits")
+@patch("src.routes.care_episodes.SessionLocal")
+def test_get_patient_audits_route_returns_items(mock_session, mock_get_audits, mock_current, client, rsa_keypair):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    mock_get_audits.return_value = (
+        [{
+            "history_uuid": str(uuid.uuid4()),
+            "chat_interaction_uuid": str(uuid.uuid4()),
+            "patient_uuid": PATIENT,
+            "summary": "Stable recovery.",
+            "changed_at": "2026-06-18T12:00:00+00:00",
+            "changed_by_uuid": "00000000-0000-7000-8000-000000000000",
+            "changed_by_type": 2,
+            "change_type": 2,
+        }],
+        1,
+    )
+    response = client.get(
+        f"/api/v1/care-episodes/{PATIENT}/audits?source=risk&page=1&page_size=20",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["source"] == "risk"
+    assert body["total"] == 1
+    assert len(body["items"]) == 1
+
+
+@patch("src.services.care_episode_service.get_current_episode", return_value=_mock_episode_row())
+def test_get_patient_audits_route_requires_source(mock_current, client, rsa_keypair):
+    response = client.get(
+        f"/api/v1/care-episodes/{PATIENT}/audits",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 400

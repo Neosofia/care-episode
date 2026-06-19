@@ -84,6 +84,7 @@ def test_upsert_episode_updates_care_window_days_on_active_episode():
             "care_window_days": 14,
         },
         changed_by_uuid=str(uuid.uuid4()),
+        changed_by_type=1,
     )
 
     assert active.care_window_days == 14
@@ -135,6 +136,7 @@ def test_start_new_episode_rejects_active_episode():
                 "risk_level": "low",
             },
             changed_by_uuid=str(uuid.uuid4()),
+            changed_by_type=1,
         )
 
 

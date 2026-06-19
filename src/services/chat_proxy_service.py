@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from authorization_in_the_middle.audit_attribution import request_audit_actor
 from authorization_in_the_middle.flask_identity import jwt_claim_principal_attributes
 from flask import g, has_request_context
 from werkzeug.exceptions import Conflict, NotFound
@@ -115,6 +116,9 @@ def proxy_chat_completion(
     if payload.get("content") or payload.get("session_start"):
         row = get_active_episode(db, patient_uuid)
         if row is not None:
+            actor = request_audit_actor()
             row.last_activity = _default_last_activity()
+            row.changed_by_uuid = uuid.UUID(actor.uuid)
+            row.changed_by_type = actor.type
             db.commit()
     return result

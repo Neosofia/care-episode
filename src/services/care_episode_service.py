@@ -344,7 +344,7 @@ def patch_episode(
     payload: dict,
     *,
     changed_by_uuid: str,
-    changed_by_type: int = 2,
+    changed_by_type: int,
 ) -> dict | None:
     row = get_episode_row(db, episode_uuid)
     if row is None:
@@ -385,7 +385,7 @@ def bulk_close_episodes(
     patient_uuids: list[str],
     *,
     changed_by_uuid: str,
-    changed_by_type: int = 2,
+    changed_by_type: int,
 ) -> dict:
     actor_id = uuid.UUID(str(changed_by_uuid))
     closed: list[str] = []
@@ -410,7 +410,7 @@ def start_new_episode(
     payload: dict,
     *,
     changed_by_uuid: str,
-    changed_by_type: int = 2,
+    changed_by_type: int,
 ) -> dict:
     if get_active_episode(db, patient_uuid) is not None:
         raise Conflict("an active care episode exists; close it before starting a new procedure")
@@ -526,7 +526,7 @@ def mark_inbox_message_read(
     message_uuid: str,
     *,
     changed_by_uuid: str,
-    changed_by_type: int = 2,
+    changed_by_type: int,
 ) -> dict | None:
     patient_id = uuid.UUID(str(patient_uuid))
     message_id = uuid.UUID(str(message_uuid))
@@ -555,7 +555,7 @@ def replace_appointments(
     items: list[dict],
     *,
     changed_by_uuid: str,
-    changed_by_type: int = 2,
+    changed_by_type: int,
 ) -> dict:
     patient_id = uuid.UUID(str(patient_uuid))
     actor_id = uuid.UUID(str(changed_by_uuid))
@@ -611,7 +611,7 @@ def replace_inbox_messages(
     items: list[dict],
     *,
     changed_by_uuid: str,
-    changed_by_type: int = 2,
+    changed_by_type: int,
 ) -> dict:
     patient_id = uuid.UUID(str(patient_uuid))
     actor_id = uuid.UUID(str(changed_by_uuid))

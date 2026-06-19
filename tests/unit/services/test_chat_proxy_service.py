@@ -94,12 +94,18 @@ def test_proxy_chat_completion_updates_last_activity(mock_create, mock_evaluate,
         "user_message": {"message_uuid": "00000000-0000-7000-8000-000000000099"},
     }
     mock_evaluate.return_value = {"risk_level": "low", "escalated": False}
-    result = proxy_chat_completion(
-        db,
-        PATIENT,
-        INTERACTION,
-        {"content": "Hi", "patient_display_name": "Alex Patient"},
-    )
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        g.jwt_claims = {
+            "sub": PATIENT,
+            "neosofia:token_type": "human",
+        }
+        result = proxy_chat_completion(
+            db,
+            PATIENT,
+            INTERACTION,
+            {"content": "Hi", "patient_display_name": "Alex Patient"},
+        )
     assert result["message"] == "hello"
     assert result["risk_evaluation"]["risk_level"] == "low"
     mock_evaluate.assert_called_once()
@@ -115,11 +121,17 @@ def test_proxy_chat_completion_skips_risk_on_session_start(mock_create, mock_eva
     db = MagicMock()
     mock_active.return_value = _episode_row()
     mock_create.return_value = {"message": "Welcome", "assistant_message": {"message_uuid": "a1"}}
-    result = proxy_chat_completion(
-        db,
-        PATIENT,
-        INTERACTION,
-        {"session_start": True},
-    )
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        g.jwt_claims = {
+            "sub": PATIENT,
+            "neosofia:token_type": "human",
+        }
+        result = proxy_chat_completion(
+            db,
+            PATIENT,
+            INTERACTION,
+            {"session_start": True},
+        )
     assert "risk_evaluation" not in result
     mock_evaluate.assert_not_called()

@@ -333,6 +333,85 @@
         }
       }
     },
+    "/api/v1/care-episodes/{patient_uuid}/audits": {
+      "get": {
+        "operationId": "listPatientCareEpisodeAudits",
+        "parameters": [
+          {
+            "name": "patient_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "episode",
+                "risk"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated audit history for a patient's care episodes or rolling risk evaluations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientCareEpisodeAuditListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/care-episodes/{patient_uuid}/records": {
       "get": {
         "operationId": "listCareEpisodeRecords",
@@ -429,10 +508,6 @@
                     "items": {
                       "$ref": "#/components/schemas/RecordUpsertItem"
                     }
-                  },
-                  "changed_by_uuid": {
-                    "type": "string",
-                    "format": "uuid"
                   }
                 }
               }
@@ -579,10 +654,6 @@
                     "items": {
                       "$ref": "#/components/schemas/AppointmentUpsertItem"
                     }
-                  },
-                  "changed_by_uuid": {
-                    "type": "string",
-                    "format": "uuid"
                   }
                 }
               }
@@ -729,10 +800,6 @@
                     "items": {
                       "$ref": "#/components/schemas/InboxMessageUpsertItem"
                     }
-                  },
-                  "changed_by_uuid": {
-                    "type": "string",
-                    "format": "uuid"
                   }
                 }
               }
@@ -1178,10 +1245,6 @@
               "low"
             ]
           },
-          "changed_by_uuid": {
-            "type": "string",
-            "format": "uuid"
-          },
           "reactivate": {
             "type": "boolean",
             "description": "When true on a closed episode, archives the prior discharge and starts a new procedure. Rejected when an active episode exists."
@@ -1224,10 +1287,6 @@
               "medium",
               "low"
             ]
-          },
-          "changed_by_uuid": {
-            "type": "string",
-            "format": "uuid"
           },
           "care_window_days": {
             "type": "integer",
@@ -1303,6 +1362,170 @@
           }
         }
       },
+      "PatientCareEpisodeAuditListResponse": {
+        "type": "object",
+        "required": [
+          "patient_uuid",
+          "source",
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "properties": {
+          "patient_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "episode",
+              "risk"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/CareEpisodeRecoveryAuditItem"
+                },
+                {
+                  "$ref": "#/components/schemas/InteractionRiskAuditItem"
+                }
+              ]
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "CareEpisodeRecoveryAuditItem": {
+        "type": "object",
+        "required": [
+          "episode_uuid",
+          "patient_uuid",
+          "surgery",
+          "procedure_date",
+          "recovery_id",
+          "risk_level",
+          "care_window_days",
+          "status",
+          "tenant_uuid",
+          "changed_at",
+          "changed_by_uuid",
+          "changed_by_type",
+          "change_type"
+        ],
+        "properties": {
+          "history_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "episode_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "surgery": {
+            "type": "string"
+          },
+          "procedure_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "recovery_id": {
+            "type": "string"
+          },
+          "risk_level": {
+            "type": "string"
+          },
+          "care_window_days": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tenant_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changed_by_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changed_by_type": {
+            "type": "integer"
+          },
+          "change_type": {
+            "type": "integer"
+          }
+        }
+      },
+      "InteractionRiskAuditItem": {
+        "type": "object",
+        "required": [
+          "chat_interaction_uuid",
+          "patient_uuid",
+          "summary",
+          "changed_at",
+          "changed_by_uuid",
+          "changed_by_type",
+          "change_type"
+        ],
+        "properties": {
+          "history_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "chat_interaction_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Rolling clinical risk summary after the evaluated chat turn."
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changed_by_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changed_by_type": {
+            "type": "integer"
+          },
+          "change_type": {
+            "type": "integer"
+          }
+        }
+      },
       "PatchEpisodeRequest": {
         "type": "object",
         "properties": {
@@ -1317,10 +1540,6 @@
             "type": "integer",
             "minimum": 1,
             "description": "Post-discharge monitoring window length in days for this episode."
-          },
-          "changed_by_uuid": {
-            "type": "string",
-            "format": "uuid"
           }
         }
       },
@@ -1364,10 +1583,6 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          "changed_by_uuid": {
-            "type": "string",
-            "format": "uuid"
           }
         }
       },

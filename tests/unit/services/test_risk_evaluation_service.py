@@ -96,6 +96,7 @@ def test_update_risk_after_patient_chat_message_updates_episode_and_escalates(
     db.commit.assert_called_once()
 
 
+@patch("src.services.risk_evaluation_service.log_event")
 @patch("src.services.risk_evaluation_service.notification_client.submit_clinical_escalation")
 @patch(
     "src.services.risk_evaluation_service.RiskAgent.evaluate",
@@ -109,6 +110,7 @@ def test_update_risk_after_patient_chat_message_escalation_sends_deep_link_only(
     mock_configured,
     mock_evaluate,
     mock_submit,
+    mock_log_event,
 ):
     db = MagicMock()
     db.get.return_value = None
@@ -128,6 +130,13 @@ def test_update_risk_after_patient_chat_message_escalation_sends_deep_link_only(
         tenant_uuid=str(TENANT),
         chat_interaction_uuid=str(INTERACTION),
         message_uuid=str(MESSAGE),
+    )
+    mock_log_event.assert_called_once_with(
+        "clinical_escalation.submitted",
+        episode_uuid=str(EPISODE),
+        chat_interaction_uuid=str(INTERACTION),
+        chat_message_uuid=str(MESSAGE),
+        tenant_uuid=str(TENANT),
     )
 
 

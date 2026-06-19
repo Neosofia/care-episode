@@ -3,6 +3,10 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
+from authorization_in_the_middle.audit_attribution import (
+    reject_client_audit_attribution,
+    request_audit_actor,
+)
 from authorization_in_the_middle.rest_entities import (
     _entities_for_write_member,
     _resource_uid_for_write_member,
@@ -36,12 +40,35 @@ from src.services.care_episode_service import (
     start_new_episode,
     upsert_episode,
 )
+from src.services.patient_audit_service import (
+    InvalidAuditSourceError,
+    PatientNotFoundError,
+    get_patient_audits,
+)
 from src.services.chat_proxy_service import (
     create_chat_interaction,
     proxy_chat_completion,
 )
 
 bp = Blueprint("care-episodes", __name__, url_prefix="/api/v1/care-episodes")
+
+_DEFAULT_PAGE_SIZE = 20
+_MAX_PAGE_SIZE = 100
+
+
+def _parse_pagination() -> tuple[int, int] | tuple[None, tuple]:
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+        page_size = min(
+            _MAX_PAGE_SIZE,
+            max(1, int(request.args.get("page_size", _DEFAULT_PAGE_SIZE))),
+        )
+    except (TypeError, ValueError):
+        return None, (
+            jsonify({"error": "invalid pagination", "message": "page and page_size must be integers"}),
+            400,
+        )
+    return (page, page_size), None
 
 _MEMBER_LIST = dict(
     action='Action::"care-episode:list"',
@@ -130,6 +157,11 @@ def _episode_member_resource_uid() -> str:
     return _resource_uid_from_entity(_episode_member_entities()[1])
 
 
+def _audit_actor_from_request(payload: dict | None = None):
+    reject_client_audit_attribution(payload)
+    return request_audit_actor()
+
+
 def init_care_episode_routes(app, cedar_evaluator):
     app.extensions["cedar_evaluator"] = cedar_evaluator
     app.register_blueprint(bp)
@@ -155,14 +187,17 @@ def get_care_episodes() -> Response:
 )
 def post_bulk_close_episodes() -> Response:
     payload = request.get_json(silent=True) or {}
+    reject_client_audit_attribution(payload)
     patient_uuids = payload.get("patient_uuids")
     if not isinstance(patient_uuids, list) or not patient_uuids:
         raise BadRequest("patient_uuids must be a non-empty list")
+    actor = request_audit_actor()
     with SessionLocal() as db:
         item = bulk_close_episodes(
             db,
             [str(value) for value in patient_uuids],
-            changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"),
+            changed_by_uuid=actor.uuid,
+            changed_by_type=actor.type,
         )
     return jsonify(item)
 
@@ -191,13 +226,15 @@ def get_episode_by_uuid(episode_uuid: str) -> Response:
 )
 def patch_episode_by_uuid(episode_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
+    actor = _audit_actor_from_request(payload)
     with SessionLocal() as db:
         try:
             item = patch_episode(
                 db,
                 episode_uuid,
                 payload,
-                changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"),
+                changed_by_uuid=actor.uuid,
+                changed_by_type=actor.type,
             )
         except Conflict as exc:
             raise BadRequest(str(exc)) from exc
@@ -241,17 +278,46 @@ def post_start_episode(patient_uuid: str) -> Response:
         raise BadRequest("procedure_date must be YYYY-MM-DD") from exc
     with SessionLocal() as db:
         try:
+            actor = _audit_actor_from_request(payload)
             item = start_new_episode(
                 db,
                 patient_uuid,
                 payload,
-                changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"),
+                changed_by_uuid=actor.uuid,
+                changed_by_type=actor.type,
             )
         except Conflict as exc:
             raise BadRequest(str(exc)) from exc
         except ValueError as exc:
             raise BadRequest(str(exc)) from exc
     return jsonify(item), 201
+
+
+@bp.get("/<patient_uuid>/audits")
+@with_security(rate_limit=settings.care_episode_read_rate_limit, **_MEMBER_LIST)
+def get_patient_audit_history(patient_uuid: str) -> Response:
+    pagination, error = _parse_pagination()
+    if error:
+        return error
+    page, page_size = pagination
+    source = (request.args.get("source") or "").strip().lower()
+    if not source:
+        return jsonify({"error": "invalid source", "message": "source must be 'episode' or 'risk'"}), 400
+    try:
+        with SessionLocal() as db:
+            items, total = get_patient_audits(db, patient_uuid, source, page, page_size)
+            return jsonify({
+                "patient_uuid": patient_uuid,
+                "source": source,
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+            }), 200
+    except PatientNotFoundError:
+        raise NotFound("patient care episodes not found")
+    except InvalidAuditSourceError:
+        return jsonify({"error": "invalid source", "message": "source must be 'episode' or 'risk'"}), 400
 
 
 @bp.get("/<patient_uuid>/records")
@@ -279,6 +345,7 @@ def get_messages(patient_uuid: str) -> Response:
 @with_security(rate_limit=settings.care_episode_write_rate_limit, **_MEMBER_CREATE)
 def post_appointments(patient_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
+    actor = _audit_actor_from_request(payload)
     items = payload.get("items")
     if not isinstance(items, list):
         raise BadRequest("items must be a list")
@@ -287,7 +354,8 @@ def post_appointments(patient_uuid: str) -> Response:
             db,
             patient_uuid,
             items,
-            changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"),
+            changed_by_uuid=actor.uuid,
+            changed_by_type=actor.type,
         )
     return jsonify(item), 201
 
@@ -296,12 +364,14 @@ def post_appointments(patient_uuid: str) -> Response:
 @with_security(rate_limit=settings.care_episode_write_rate_limit, **_MEMBER_CREATE)
 def patch_message_read(patient_uuid: str, message_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
+    actor = _audit_actor_from_request(payload)
     with SessionLocal() as db:
         item = mark_inbox_message_read(
             db,
             patient_uuid,
             message_uuid,
-            changed_by_uuid=payload.get("changed_by_uuid", patient_uuid),
+            changed_by_uuid=actor.uuid,
+            changed_by_type=actor.type,
         )
     if item is None:
         raise NotFound("message not found")
@@ -312,6 +382,7 @@ def patch_message_read(patient_uuid: str, message_uuid: str) -> Response:
 @with_security(rate_limit=settings.care_episode_write_rate_limit, **_MEMBER_CREATE)
 def post_messages(patient_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
+    actor = _audit_actor_from_request(payload)
     items = payload.get("items")
     if not isinstance(items, list):
         raise BadRequest("items must be a list")
@@ -320,7 +391,8 @@ def post_messages(patient_uuid: str) -> Response:
             db,
             patient_uuid,
             items,
-            changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"),
+            changed_by_uuid=actor.uuid,
+            changed_by_type=actor.type,
         )
     return jsonify(item), 201
 
@@ -351,7 +423,13 @@ def post_care_episode() -> Response:
         raise BadRequest("procedure_date must be YYYY-MM-DD") from exc
     with SessionLocal() as db:
         try:
-            item = upsert_episode(db, payload, changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"))
+            actor = _audit_actor_from_request(payload)
+            item = upsert_episode(
+                db,
+                payload,
+                changed_by_uuid=actor.uuid,
+                changed_by_type=actor.type,
+            )
         except Conflict as exc:
             raise BadRequest(str(exc)) from exc
         except ValueError as exc:
@@ -403,6 +481,7 @@ def post_chat_completion(patient_uuid: str, chat_interaction_uuid: str) -> Respo
 @with_security(rate_limit=settings.care_episode_write_rate_limit, **_MEMBER_CREATE)
 def post_records(patient_uuid: str) -> Response:
     payload = request.get_json(silent=True) or {}
+    actor = _audit_actor_from_request(payload)
     records = payload.get("items")
     if not isinstance(records, list):
         raise BadRequest("items must be a list")
@@ -411,6 +490,7 @@ def post_records(patient_uuid: str) -> Response:
             db,
             patient_uuid,
             records,
-            changed_by_uuid=payload.get("changed_by_uuid", "00000000-0000-7000-8000-000000000000"),
+            changed_by_uuid=actor.uuid,
+            changed_by_type=actor.type,
         )
     return jsonify(item), 201

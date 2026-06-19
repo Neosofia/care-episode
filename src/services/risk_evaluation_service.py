@@ -6,6 +6,7 @@ from typing import Any
 from werkzeug.exceptions import BadGateway, ServiceUnavailable
 
 from src.bootstrap.config import settings
+from src.bootstrap.logging_config import log_event
 from src.bootstrap.request_telemetry import log_request_handled
 from src.clients import notification_client
 from src.models.care_episode import CareEpisode
@@ -82,6 +83,13 @@ def _submit_high_risk_escalation_to_notification(
         log_request_handled("risk_escalation", 502, outcome="notification_downstream")
         return False
 
+    log_event(
+        "clinical_escalation.submitted",
+        episode_uuid=str(episode.episode_uuid),
+        chat_interaction_uuid=str(chat_interaction_uuid),
+        chat_message_uuid=str(chat_message_uuid),
+        tenant_uuid=str(tenant_uuid),
+    )
     log_request_handled("risk_escalation", 200, outcome="submitted")
     return True
 

@@ -2,6 +2,21 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.10.0] - 2026-06-19
+
+### Added
+
+- **`GET /api/v1/care-episodes/{patient_uuid}/audits`** — paginated episode and rolling-risk audit history (`source=episode` or `source=risk`) for authorized clinicians.
+
+### Changed
+
+- Audit attribution is derived from the authenticated JWT (**`authorization-in-the-middle/v0.7.7`**); write APIs reject client-supplied `changed_by_uuid` / `changed_by_type`.
+- Pinned **`authorization-in-the-middle/v0.7.7`**.
+
+### Security
+
+- Removed forgeable audit actor fields from all care-episode write request bodies.
+
 ## [0.9.1] - 2026-06-18
 
 ### Fixed

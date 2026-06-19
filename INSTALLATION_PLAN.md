@@ -2,6 +2,29 @@
 
 Per-version deploy steps for operators. User-visible changes: [CHANGELOG.md](CHANGELOG.md).
 
+## care-episode v0.10.0
+
+**Image:** `ghcr.io/neosofia/care-episode:v0.10.0` (tag `care-episode/v0.10.0`)
+
+**Build identifiers:** **`authorization-in-the-middle/v0.7.7`**; deploy **authentication v0.39.0** or later in the same window so service tokens carry `neosofia:service_uuid`.
+
+**Deploy:**
+
+1. Redeploy **authentication v0.39.0** (if not already on that tag).
+2. Redeploy **care-episode v0.10.0** (no new migration; head **`012`**).
+
+**Verify:**
+
+- `GET /health` → `"version": "0.10.0"`.
+- `alembic_version` is **`012`**.
+- Clinician patient detail → **Audits** loads episode and rolling-risk sections; CSV export works.
+- `PATCH /api/v1/care-episodes/{episode_uuid}` with `changed_by_uuid` in the body returns **400**.
+- Close/reopen episode shows **User** (not **Service**) for clinician actions in audit history.
+
+**Evidence:** Health JSON; audit UI screenshot; rejected forged attribution response.
+
+---
+
 ## care-episode v0.9.0
 
 **Image:** `ghcr.io/neosofia/care-episode:v0.9.0` (tag `care-episode/v0.9.0`)
