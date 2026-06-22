@@ -2,6 +2,12 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.11.0] - 2026-06-22
+
+### Added
+
+- **`GET /api/v1/care-episodes/procedures`** — tenant-scoped procedure catalog for clinician enrollment (`q` filter optional). Bundled from `src/data/procedure_catalog.json`.
+
 ## [0.10.0] - 2026-06-19
 
 ### Added

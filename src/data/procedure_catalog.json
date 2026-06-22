@@ -1,0 +1,374 @@
+{
+  "procedure_type_labels": {
+    "general-surgery": "General surgery",
+    "orthopedic": "Orthopedic",
+    "cardiac": "Cardiac",
+    "other": "Other"
+  },
+  "procedures": [
+    {
+      "id": "lap-chole",
+      "name": "Laparoscopic cholecystectomy",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-47562",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "lap-appendectomy",
+      "name": "Laparoscopic appendectomy",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-44970",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "open-appendectomy",
+      "name": "Open appendectomy",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-44950",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "inguinal-hernia-lap",
+      "name": "Inguinal hernia repair, laparoscopic",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-49650",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "umbilical-hernia",
+      "name": "Umbilical hernia repair",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-49585",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "ventral-hernia-open",
+      "name": "Ventral hernia repair, open",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-49560",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "colectomy-partial",
+      "name": "Partial colectomy, laparoscopic",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-44205",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "sigmoid-colectomy-lap",
+      "name": "Laparoscopic sigmoid colectomy",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-44204",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "nissen-fundoplication",
+      "name": "Laparoscopic Nissen fundoplication",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-43280",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "roux-en-y-gastric-bypass",
+      "name": "Roux-en-Y gastric bypass, laparoscopic",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-43644",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "sleeve-gastrectomy",
+      "name": "Sleeve gastrectomy, laparoscopic",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-43775",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "hemorrhoidectomy",
+      "name": "Hemorrhoidectomy",
+      "procedure_type": "general-surgery",
+      "emr_ref": "PROC-GS-46255",
+      "specialty": "General surgery"
+    },
+    {
+      "id": "tkr",
+      "name": "Total knee arthroplasty",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-27447",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "thr",
+      "name": "Total hip arthroplasty",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-27130",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "partial-knee-arthroplasty",
+      "name": "Partial knee arthroplasty",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-27446",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "acl-reconstruction",
+      "name": "ACL reconstruction, arthroscopic",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-29888",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "rotator-cuff",
+      "name": "Rotator cuff repair, arthroscopic",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-29827",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "shoulder-arthroscopy-decompression",
+      "name": "Shoulder arthroscopy with subacromial decompression",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-29826",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "meniscus-repair",
+      "name": "Meniscus repair, arthroscopic",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-29882",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "lumbar-microdiscectomy",
+      "name": "Lumbar microdiscectomy",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-63030",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "lumbar-laminectomy",
+      "name": "Lumbar laminectomy",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-63047",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "lumbar-fusion-tlif",
+      "name": "Lumbar fusion, transforaminal interbody (TLIF)",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-22612",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "cervical-acdf",
+      "name": "Cervical anterior cervical discectomy and fusion (ACDF)",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-22551",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "orif-ankle",
+      "name": "Open reduction internal fixation, ankle fracture",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-27814",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "orif-wrist",
+      "name": "Open reduction internal fixation, distal radius fracture",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-25607",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "bunionectomy",
+      "name": "Bunionectomy with osteotomy",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-28296",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "carpal-tunnel-release",
+      "name": "Carpal tunnel release",
+      "procedure_type": "orthopedic",
+      "emr_ref": "PROC-OR-64721",
+      "specialty": "Orthopedics"
+    },
+    {
+      "id": "cabg",
+      "name": "Coronary artery bypass graft (CABG)",
+      "procedure_type": "cardiac",
+      "emr_ref": "PROC-CV-33533",
+      "specialty": "Cardiac"
+    },
+    {
+      "id": "pci-stent",
+      "name": "Percutaneous coronary intervention with stent",
+      "procedure_type": "cardiac",
+      "emr_ref": "PROC-CV-92928",
+      "specialty": "Cardiac"
+    },
+    {
+      "id": "tavr",
+      "name": "Transcatheter aortic valve replacement (TAVR)",
+      "procedure_type": "cardiac",
+      "emr_ref": "PROC-CV-33361",
+      "specialty": "Cardiac"
+    },
+    {
+      "id": "aortic-valve-replacement",
+      "name": "Surgical aortic valve replacement",
+      "procedure_type": "cardiac",
+      "emr_ref": "PROC-CV-33405",
+      "specialty": "Cardiac"
+    },
+    {
+      "id": "mitral-valve-repair",
+      "name": "Mitral valve repair",
+      "procedure_type": "cardiac",
+      "emr_ref": "PROC-CV-33426",
+      "specialty": "Cardiac"
+    },
+    {
+      "id": "pacemaker",
+      "name": "Dual-chamber pacemaker implant",
+      "procedure_type": "cardiac",
+      "emr_ref": "PROC-CV-33208",
+      "specialty": "Cardiac"
+    },
+    {
+      "id": "icd-implant",
+      "name": "Implantable cardioverter-defibrillator (ICD) placement",
+      "procedure_type": "cardiac",
+      "emr_ref": "PROC-CV-33249",
+      "specialty": "Cardiac"
+    },
+    {
+      "id": "carotid-endarterectomy",
+      "name": "Carotid endarterectomy",
+      "procedure_type": "cardiac",
+      "emr_ref": "PROC-CV-35301",
+      "specialty": "Vascular surgery"
+    },
+    {
+      "id": "evar",
+      "name": "Endovascular abdominal aortic aneurysm repair (EVAR)",
+      "procedure_type": "cardiac",
+      "emr_ref": "PROC-CV-34701",
+      "specialty": "Vascular surgery"
+    },
+    {
+      "id": "c-section",
+      "name": "Cesarean delivery",
+      "procedure_type": "other",
+      "emr_ref": "PROC-OB-59514",
+      "specialty": "Obstetrics"
+    },
+    {
+      "id": "lap-hysterectomy",
+      "name": "Laparoscopic hysterectomy",
+      "procedure_type": "other",
+      "emr_ref": "PROC-GY-58571",
+      "specialty": "Gynecology"
+    },
+    {
+      "id": "vaginal-hysterectomy",
+      "name": "Vaginal hysterectomy",
+      "procedure_type": "other",
+      "emr_ref": "PROC-GY-58260",
+      "specialty": "Gynecology"
+    },
+    {
+      "id": "lap-myomectomy",
+      "name": "Laparoscopic myomectomy",
+      "procedure_type": "other",
+      "emr_ref": "PROC-GY-58661",
+      "specialty": "Gynecology"
+    },
+    {
+      "id": "turp",
+      "name": "Transurethral resection of prostate (TURP)",
+      "procedure_type": "other",
+      "emr_ref": "PROC-UR-52601",
+      "specialty": "Urology"
+    },
+    {
+      "id": "robotic-prostatectomy",
+      "name": "Robotic-assisted radical prostatectomy",
+      "procedure_type": "other",
+      "emr_ref": "PROC-UR-55866",
+      "specialty": "Urology"
+    },
+    {
+      "id": "lap-nephrectomy",
+      "name": "Laparoscopic nephrectomy",
+      "procedure_type": "other",
+      "emr_ref": "PROC-UR-50545",
+      "specialty": "Urology"
+    },
+    {
+      "id": "ureteroscopy-stone",
+      "name": "Ureteroscopy with stone extraction",
+      "procedure_type": "other",
+      "emr_ref": "PROC-UR-52356",
+      "specialty": "Urology"
+    },
+    {
+      "id": "thyroidectomy",
+      "name": "Total thyroidectomy",
+      "procedure_type": "other",
+      "emr_ref": "PROC-EN-60240",
+      "specialty": "Endocrine surgery"
+    },
+    {
+      "id": "parathyroidectomy",
+      "name": "Parathyroidectomy",
+      "procedure_type": "other",
+      "emr_ref": "PROC-EN-60500",
+      "specialty": "Endocrine surgery"
+    },
+    {
+      "id": "tonsillectomy",
+      "name": "Tonsillectomy",
+      "procedure_type": "other",
+      "emr_ref": "PROC-EN-42826",
+      "specialty": "Otolaryngology"
+    },
+    {
+      "id": "septoplasty-turbinate",
+      "name": "Septoplasty with turbinate reduction",
+      "procedure_type": "other",
+      "emr_ref": "PROC-EN-30520",
+      "specialty": "Otolaryngology"
+    },
+    {
+      "id": "vats-lobectomy",
+      "name": "VATS lobectomy",
+      "procedure_type": "other",
+      "emr_ref": "PROC-TH-32663",
+      "specialty": "Thoracic surgery"
+    },
+    {
+      "id": "vats-wedge-resection",
+      "name": "VATS wedge resection",
+      "procedure_type": "other",
+      "emr_ref": "PROC-TH-32666",
+      "specialty": "Thoracic surgery"
+    },
+    {
+      "id": "craniotomy-tumor",
+      "name": "Craniotomy for tumor resection",
+      "procedure_type": "other",
+      "emr_ref": "PROC-NS-61510",
+      "specialty": "Neurosurgery"
+    },
+    {
+      "id": "breast-reconstruction",
+      "name": "Breast reconstruction with tissue expander",
+      "procedure_type": "other",
+      "emr_ref": "PROC-PL-19357",
+      "specialty": "Plastic surgery"
+    }
+  ]
+}

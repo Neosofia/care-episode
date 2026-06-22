@@ -14,6 +14,7 @@ def test_openapi_spec_contains_core_paths():
     assert spec["info"]["title"] == "Care Episode Service API"
     assert "/health" in spec["paths"]
     assert "/api/v1/care-episodes" in spec["paths"]
+    assert "/api/v1/care-episodes/procedures" in spec["paths"]
     assert "/api/v1/care-episodes/{patient_uuid}/chat/interactions" in spec["paths"]
     assert (
         "/api/v1/care-episodes/{patient_uuid}/chat/interactions/{chat_interaction_uuid}/completions"
@@ -33,7 +34,23 @@ def test_openapi_spec_contains_core_paths():
         "ChatMessageSummary",
     ):
         assert schema not in spec["components"]["schemas"]
-    assert spec["info"]["version"] == "0.6.0"
+    assert spec["info"]["version"] == "0.11.0"
+
+
+def test_openapi_operation_ids_are_unique():
+    root = Path(__file__).resolve().parents[3]
+    spec = json.loads((root / "openapi.json").read_text())
+
+    operation_ids: list[str] = []
+    for path_item in spec["paths"].values():
+        for method, operation in path_item.items():
+            if method.startswith("x") or not isinstance(operation, dict):
+                continue
+            operation_id = operation.get("operationId")
+            if operation_id:
+                operation_ids.append(operation_id)
+
+    assert len(operation_ids) == len(set(operation_ids))
 
 
 def test_openapi_spec_defines_episode_risk_level():

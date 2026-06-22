@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Care Episode Service API",
-    "version": "0.6.0",
+    "version": "0.11.0",
     "description": "Care episodes, demo recoveries, records, appointments, inbox messages, and patient chat proxy."
   },
   "paths": {
@@ -148,6 +148,54 @@
         }
       }
     },
+    "/api/v1/care-episodes/procedures": {
+      "get": {
+        "operationId": "listProcedureCatalog",
+        "summary": "Searchable post-operative procedure catalog",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-insensitive filter across procedure name, specialty, EMR reference, and type."
+          },
+          {
+            "name": "tenant_uuid",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Procedure catalog entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcedureCatalogResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/care-episodes/bulk-close": {
       "post": {
         "operationId": "bulkCloseCareEpisodeRecoveries",
@@ -271,7 +319,7 @@
     },
     "/api/v1/care-episodes/{patient_uuid}/episodes": {
       "get": {
-        "operationId": "listCareEpisodes",
+        "operationId": "listPatientCareEpisodes",
         "parameters": [
           {
             "name": "patient_uuid",
@@ -1135,6 +1183,60 @@
               "authorization_unavailable",
               "internal_server_error"
             ]
+          }
+        }
+      },
+      "ProcedureCatalogEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "procedure_type",
+          "emr_ref",
+          "specialty"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "procedure_type": {
+            "type": "string",
+            "enum": [
+              "general-surgery",
+              "orthopedic",
+              "cardiac",
+              "other"
+            ]
+          },
+          "emr_ref": {
+            "type": "string"
+          },
+          "specialty": {
+            "type": "string"
+          }
+        }
+      },
+      "ProcedureCatalogResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "procedure_type_labels"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcedureCatalogEntry"
+            }
+          },
+          "procedure_type_labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         }
       },

@@ -2,6 +2,24 @@
 
 Per-version deploy steps for operators. User-visible changes: [CHANGELOG.md](CHANGELOG.md).
 
+## care-episode v0.11.0
+
+**Image:** `ghcr.io/neosofia/care-episode:v0.11.0` (tag `care-episode/v0.11.0`)
+
+**Deploy:**
+
+1. Redeploy **care-episode v0.11.0** (no new migration; head **`012`**).
+
+**Verify:**
+
+- `GET /health` → `"version": "0.11.0"`.
+- `GET /api/v1/care-episodes/procedures` returns catalog items (clinician JWT).
+- CDP enroll workflow can load procedure picker without **503**.
+
+**Evidence:** Health JSON; `GET /procedures` response sample; enroll e2e or manual procedure picker screenshot.
+
+---
+
 ## care-episode v0.10.0
 
 **Image:** `ghcr.io/neosofia/care-episode:v0.10.0` (tag `care-episode/v0.10.0`)

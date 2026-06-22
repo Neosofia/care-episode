@@ -45,6 +45,7 @@ from src.services.patient_audit_service import (
     PatientNotFoundError,
     get_patient_audits,
 )
+from src.services.procedure_catalog import procedure_catalog_response
 from src.services.chat_proxy_service import (
     create_chat_interaction,
     proxy_chat_completion,
@@ -54,6 +55,7 @@ bp = Blueprint("care-episodes", __name__, url_prefix="/api/v1/care-episodes")
 
 _DEFAULT_PAGE_SIZE = 20
 _MAX_PAGE_SIZE = 100
+_PROCEDURE_CATALOG_CACHE_SECONDS = 30 * 60
 
 
 def _parse_pagination() -> tuple[int, int] | tuple[None, tuple]:
@@ -177,6 +179,18 @@ def get_care_episodes() -> Response:
     status = request.args.get("status")
     with SessionLocal() as db:
         return jsonify({"items": list_episodes(db, tenant_uuid=tenant_uuid, status=status)})
+
+
+@bp.get("/procedures")
+@with_security(
+    rate_limit=settings.care_episode_read_rate_limit,
+    catalog_attrs=_principal_tenant_catalog_attrs,
+)
+def get_procedure_catalog() -> Response:
+    query = request.args.get("q")
+    response = jsonify(procedure_catalog_response(query))
+    response.headers["Cache-Control"] = f"private, max-age={_PROCEDURE_CATALOG_CACHE_SECONDS}"
+    return response
 
 
 @bp.post("/bulk-close")

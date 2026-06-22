@@ -40,6 +40,35 @@ def test_get_care_episodes_requires_auth(client):
     assert response.status_code == 401
 
 
+def test_get_procedure_catalog_requires_auth(client):
+    response = client.get("/api/v1/care-episodes/procedures", base_url="https://localhost")
+    assert response.status_code == 401
+
+
+@patch("src.routes.care_episodes.procedure_catalog_response")
+def test_get_procedure_catalog_returns_items(mock_response, client, rsa_keypair):
+    mock_response.return_value = {
+        "items": [{
+            "id": "lap-chole",
+            "name": "Laparoscopic cholecystectomy",
+            "procedure_type": "general-surgery",
+            "emr_ref": "PROC-GS-47562",
+            "specialty": "General surgery",
+        }],
+        "procedure_type_labels": {"general-surgery": "General surgery"},
+    }
+    response = client.get(
+        "/api/v1/care-episodes/procedures?q=chole",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["items"][0]["id"] == "lap-chole"
+    assert response.headers["Cache-Control"] == "private, max-age=1800"
+    mock_response.assert_called_once_with("chole")
+
+
 @patch("src.routes.care_episodes.mark_inbox_message_read", return_value={"id": "m1", "read_at": "2026-01-01T00:00:00+00:00"})
 @patch("src.routes.care_episodes.SessionLocal")
 def test_patch_message_read(mock_session, mock_mark, client, rsa_keypair):
