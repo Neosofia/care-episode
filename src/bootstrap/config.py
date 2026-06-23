@@ -47,6 +47,7 @@ class Settings(BaseSettings):
 
     # UI-facing upstream timeouts — each must stay at or below 10 seconds.
     chat_service_timeout_seconds: float = Field(default=10.0, gt=0, le=10.0)
+    user_service_timeout_seconds: float = Field(default=10.0, gt=0, le=10.0)
 
     # Clinical risk inference (Bedrock/OpenAI-compatible completions API)
     inference_completions_url: str = ""

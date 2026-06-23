@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import uuid
 from typing import Any
 
 from authorization_in_the_middle.audit_attribution import (
@@ -21,9 +22,11 @@ from werkzeug.exceptions import BadGateway, BadRequest, Conflict, NotFound
 from src.authorization import entities as auth_entities
 from src.bootstrap.config import settings
 from src.bootstrap.request_telemetry import log_request_handled
+from src.clients import user_client
 from src.db.engine import SessionLocal
 from src.services.care_episode_service import (
     bulk_close_episodes,
+    enrolled_patient_uuids,
     get_episode,
     list_episodes,
     list_patient_episodes,
@@ -37,6 +40,7 @@ from src.services.care_episode_service import (
     replace_appointments,
     replace_inbox_messages,
     replace_records,
+    roster_filter_counts,
     start_new_episode,
     upsert_episode,
 )
@@ -164,6 +168,47 @@ def _audit_actor_from_request(payload: dict | None = None):
     return request_audit_actor()
 
 
+def _registry_search(tenant_uuid: str | None, search: str | None) -> tuple[list, dict[str, dict]]:
+    trimmed_tenant = str(tenant_uuid or "").strip()
+    trimmed_search = str(search or "").strip()
+    if not trimmed_tenant or not trimmed_search:
+        return [], {}
+    try:
+        users = user_client.list_tenant_patient_users(trimmed_tenant, search=trimmed_search)
+    except BadGateway:
+        return [], {}
+    registry_uuids: list = []
+    profiles: dict[str, dict] = {}
+    for user in users:
+        user_uuid = str(user.get("uuid") or "").strip()
+        if not user_uuid:
+            continue
+        registry_uuids.append(uuid.UUID(user_uuid))
+        profiles[user_uuid] = user_client.patient_profile_from_user(user)
+    return registry_uuids, profiles
+
+
+def _attach_patient_profiles(
+    items: list[dict],
+    prefetched_profiles: dict[str, dict] | None = None,
+) -> None:
+    if not items:
+        return
+    profiles = dict(prefetched_profiles or {})
+    patient_uuids = [str(item["patient_uuid"]) for item in items]
+    missing = [user_uuid for user_uuid in patient_uuids if user_uuid not in profiles]
+    tenant_uuid = str(items[0].get("tenant_uuid") or "").strip()
+    if missing and tenant_uuid:
+        try:
+            profiles.update(user_client.get_patient_profiles_for_tenant(tenant_uuid, missing))
+        except BadGateway:
+            pass
+    for item in items:
+        profile = profiles.get(str(item["patient_uuid"]))
+        if profile:
+            item["patient"] = profile
+
+
 def init_care_episode_routes(app, cedar_evaluator):
     app.extensions["cedar_evaluator"] = cedar_evaluator
     app.register_blueprint(bp)
@@ -177,8 +222,119 @@ def init_care_episode_routes(app, cedar_evaluator):
 def get_care_episodes() -> Response:
     tenant_uuid = request.args.get("tenant_uuid")
     status = request.args.get("status")
+    risk = request.args.get("risk")
+    q = request.args.get("q")
+    activity = request.args.get("activity")
+    min_days_post_op = request.args.get("min_days_post_op")
+    min_days_since_chat = request.args.get("min_days_since_chat")
+    pagination, error = _parse_pagination()
+    if error is not None:
+        return error
+    page, page_size = pagination
+    parsed_min_days_post_op = None
+    parsed_min_days_since_chat = None
+    try:
+        if min_days_post_op is not None and str(min_days_post_op).strip():
+            parsed_min_days_post_op = int(min_days_post_op)
+        if min_days_since_chat is not None and str(min_days_since_chat).strip():
+            parsed_min_days_since_chat = int(min_days_since_chat)
+    except (TypeError, ValueError):
+        return (
+            jsonify({"error": "invalid filter", "message": "min_days_post_op and min_days_since_chat must be integers"}),
+            400,
+        )
     with SessionLocal() as db:
-        return jsonify({"items": list_episodes(db, tenant_uuid=tenant_uuid, status=status)})
+        registry_matches, registry_profiles = _registry_search(tenant_uuid, q)
+        items, total = list_episodes(
+            db,
+            tenant_uuid=tenant_uuid,
+            status=status,
+            risk=risk,
+            q=q,
+            registry_match_uuids=registry_matches,
+            min_days_post_op=parsed_min_days_post_op,
+            activity=activity,
+            min_days_since_activity=parsed_min_days_since_chat,
+            page=page,
+            page_size=page_size,
+        )
+        _attach_patient_profiles(items, registry_profiles)
+        return jsonify({"items": items, "total": total, "page": page, "page_size": page_size})
+
+
+@bp.get("/roster-summary")
+@with_security(
+    rate_limit=settings.care_episode_read_rate_limit,
+    catalog_attrs=_catalog_tenant_attrs,
+)
+def get_roster_summary() -> Response:
+    tenant_uuid = str(request.args.get("tenant_uuid") or "").strip()
+    if not tenant_uuid:
+        return jsonify({"error": "invalid_request", "message": "tenant_uuid is required"}), 400
+    pagination, error = _parse_pagination()
+    if error is not None:
+        return error
+    preview_page, preview_page_size = pagination
+    with SessionLocal() as db:
+        counts = roster_filter_counts(db, tenant_uuid)
+        preview_items, preview_total = list_episodes(
+            db,
+            tenant_uuid=tenant_uuid,
+            status="active",
+            page=preview_page,
+            page_size=preview_page_size,
+        )
+        active_chat_items, active_chat_total = list_episodes(
+            db,
+            tenant_uuid=tenant_uuid,
+            status="active",
+            activity="active-30m",
+            page=1,
+            page_size=10,
+        )
+        _attach_patient_profiles(preview_items)
+        _attach_patient_profiles(active_chat_items)
+        return jsonify(
+            {
+                **counts,
+                "preview": {
+                    "items": preview_items,
+                    "total": preview_total,
+                    "page": preview_page,
+                    "page_size": preview_page_size,
+                },
+                "active_chats": {
+                    "items": active_chat_items,
+                    "total": active_chat_total,
+                    "page": 1,
+                    "page_size": 10,
+                },
+            }
+        )
+
+
+@bp.get("/enrollable-patients")
+@with_security(
+    rate_limit=settings.care_episode_read_rate_limit,
+    catalog_attrs=_catalog_tenant_attrs,
+)
+def get_enrollable_patients() -> Response:
+    tenant_uuid = str(request.args.get("tenant_uuid") or "").strip()
+    if not tenant_uuid:
+        return jsonify({"error": "invalid_request", "message": "tenant_uuid is required"}), 400
+    search = str(request.args.get("q") or "").strip()
+    try:
+        registry_users = user_client.list_tenant_patient_users(tenant_uuid, search=search or None)
+    except BadGateway as exc:
+        return jsonify({"error": "upstream_error", "message": str(exc.description)}), 502
+    with SessionLocal() as db:
+        enrolled = enrolled_patient_uuids(db, tenant_uuid)
+    items = [
+        row
+        for row in registry_users
+        if row.get("uuid") and uuid.UUID(str(row["uuid"])) not in enrolled
+    ]
+    return jsonify({"items": items, "total": len(items)})
 
 
 @bp.get("/procedures")

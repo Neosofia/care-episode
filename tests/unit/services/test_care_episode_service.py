@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from werkzeug.exceptions import Conflict
@@ -9,6 +9,7 @@ from src.services.care_episode_service import (
     DEFAULT_CARE_WINDOW_DAYS,
     list_episodes,
     list_patient_episodes,
+    roster_filter_counts,
     start_new_episode,
     upsert_episode,
 )
@@ -31,37 +32,118 @@ def _episode_mock(*, status: str = "active", surgery: str = "Appendectomy") -> M
     episode.status = status
     episode.tenant_uuid = TENANT_ID
     episode.changed_at = datetime.datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
+    episode.last_activity = "2026-06-01T12:00:00Z"
     return episode
 
 
-def test_list_episodes_includes_latest_risk_summary():
-    episode = _episode_mock()
-    summary_row = MagicMock()
-    summary_row.patient_uuid = PATIENT_ID
-    summary_row.summary = "Patient reports crushing chest pain."
+def _list_episode_row(*, status: str = "active", surgery: str = "Appendectomy") -> MagicMock:
+    row = MagicMock()
+    row.episode_uuid = EPISODE_ID
+    row.patient_uuid = PATIENT_ID
+    row.surgery = surgery
+    row.procedure_date = datetime.date(2026, 5, 28)
+    row.recovery_id = "S-1"
+    row.risk_level = "high"
+    row.care_window_days = 30
+    row.status = status
+    row.tenant_uuid = TENANT_ID
+    row.changed_at = datetime.datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
+    row.last_activity = "2026-06-01T12:00:00Z"
+    row.days_post_op = 13
+    return row
+
+
+def _mock_filtered_subquery():
+    subq = MagicMock()
+    subq.c.last_activity = MagicMock()
+    subq.c.risk_level = MagicMock()
+    subq.c.surgery = MagicMock()
+    return subq
+
+
+@patch("src.services.care_episode_service._latest_risk_summaries_by_patient")
+@patch("src.services.care_episode_service._filtered_episode_rows_subquery")
+def test_list_episodes_includes_latest_risk_summary(mock_filtered_subquery, mock_summaries):
+    row = _list_episode_row()
+    mock_filtered_subquery.return_value = _mock_filtered_subquery()
 
     db = MagicMock()
-    episodes_query = MagicMock()
-    episodes_query.filter.return_value = episodes_query
-    episodes_query.distinct.return_value = episodes_query
-    episodes_query.order_by.return_value = episodes_query
-    episodes_query.all.return_value = [(episode, 13)]
+    count_query = MagicMock()
+    count_query.select_from.return_value = count_query
+    count_query.scalar.return_value = 1
 
-    summaries_query = MagicMock()
-    summaries_query.filter.return_value = summaries_query
-    summaries_query.order_by.return_value = summaries_query
-    summaries_query.distinct.return_value = summaries_query
-    summaries_query.all.return_value = [summary_row]
+    page_query = MagicMock()
+    page_query.order_by.return_value = page_query
+    page_query.offset.return_value = page_query
+    page_query.limit.return_value = page_query
+    page_query.all.return_value = [row]
 
-    db.query.side_effect = [episodes_query, summaries_query]
+    db.query.side_effect = [count_query, page_query]
+    mock_summaries.return_value = {PATIENT_ID: "Patient reports crushing chest pain."}
 
-    items = list_episodes(db)
+    items, total = list_episodes(db)
 
+    assert total == 1
     assert len(items) == 1
     assert items[0]["patient_uuid"] == str(PATIENT_ID)
     assert items[0]["episode_uuid"] == str(EPISODE_ID)
     assert items[0]["risk_summary"] == "Patient reports crushing chest pain."
     assert items[0]["care_window_days"] == DEFAULT_CARE_WINDOW_DAYS
+
+
+@patch("src.services.care_episode_service._latest_risk_summaries_by_patient", return_value={})
+@patch("src.services.care_episode_service._filtered_episode_rows_subquery")
+def test_list_episodes_registry_match_uuids_filter(mock_filtered_subquery, _mock_summaries):
+    row = _list_episode_row()
+    mock_filtered_subquery.return_value = _mock_filtered_subquery()
+
+    db = MagicMock()
+    count_query = MagicMock()
+    count_query.select_from.return_value = count_query
+    count_query.scalar.return_value = 1
+
+    page_query = MagicMock()
+    page_query.order_by.return_value = page_query
+    page_query.offset.return_value = page_query
+    page_query.limit.return_value = page_query
+    page_query.all.return_value = [row]
+
+    db.query.side_effect = [count_query, page_query]
+
+    items, total = list_episodes(
+        db,
+        registry_match_uuids=[PATIENT_ID],
+        page=1,
+        page_size=20,
+    )
+
+    assert total == 1
+    assert len(items) == 1
+    mock_filtered_subquery.assert_called_once()
+    assert mock_filtered_subquery.call_args.kwargs["registry_match_uuids"] == [PATIENT_ID]
+
+
+@patch("src.services.care_episode_service._filtered_episode_rows_subquery")
+def test_roster_filter_counts_aggregates_in_one_query(mock_filtered_subquery):
+    subq = _mock_filtered_subquery()
+    mock_filtered_subquery.return_value = subq
+
+    db = MagicMock()
+    counts_query = MagicMock()
+    counts_query.select_from.return_value = counts_query
+    counts_query.one.return_value = (3, 2, 5, 1)
+    db.query.return_value = counts_query
+
+    counts = roster_filter_counts(db, str(TENANT_ID))
+
+    assert counts == {
+        "high_risk_count": 3,
+        "medium_risk_count": 2,
+        "chats_today_count": 5,
+        "active_patients_30m_count": 1,
+    }
+    mock_filtered_subquery.assert_called_once()
+    db.query.assert_called_once()
 
 
 def test_upsert_episode_updates_care_window_days_on_active_episode():

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import datetime
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import case, func
+from sqlalchemy import DateTime, String, case, cast, func, or_
 
 from werkzeug.exceptions import Conflict, NotFound
 
@@ -79,6 +80,7 @@ def _episode_dict(
         "status": episode.status or EPISODE_STATUS_ACTIVE,
         "tenant_uuid": str(episode.tenant_uuid),
         "closed_at": _closed_at_iso(episode),
+        "last_activity": episode.last_activity,
     }
     if days_post_op is not None:
         payload["days_post_op"] = int(days_post_op)
@@ -165,35 +167,288 @@ def list_patient_episodes(db, patient_uuid: str) -> list[dict]:
     ]
 
 
-def list_episodes(db, tenant_uuid: str | None = None, *, status: str | None = None) -> list[dict]:
-    days_post_op = (func.current_date() - CareEpisode.procedure_date).label("days_post_op")
-    query = db.query(CareEpisode, days_post_op)
+def _risk_filter_value(risk: str | None) -> str | None:
+    if not risk or risk == "all":
+        return None
+    if risk in {"high-risk", "high"}:
+        return "high"
+    if risk in {"medium-risk", "medium"}:
+        return "medium"
+    if risk == "low":
+        return "low"
+    return None
+
+
+def _days_post_op_expr():
+    return (func.current_date() - CareEpisode.procedure_date).label("days_post_op")
+
+
+def _last_activity_ts_expr(column=CareEpisode.last_activity):
+    return case(
+        (
+            column.op("~")(r"^\d{4}-\d{2}-\d{2}"),
+            cast(column, DateTime(timezone=True)),
+        ),
+        else_=None,
+    )
+
+
+def _risk_rank_expr(column=CareEpisode.risk_level):
+    return case(
+        (column == "high", 0),
+        (column == "medium", 1),
+        else_=2,
+    )
+
+
+def _activity_cutoff_datetime(
+    activity: str | None,
+    *,
+    now: datetime.datetime | None = None,
+) -> datetime.datetime | None:
+    if not activity or activity == "all":
+        return None
+    current = now or datetime.datetime.now(tz=UTC)
+    if activity == "active-30m":
+        return current - datetime.timedelta(minutes=30)
+    if activity == "chats-today":
+        return current - datetime.timedelta(days=1)
+    if activity == "this-week":
+        return current - datetime.timedelta(days=7)
+    return None
+
+
+def _apply_pre_distinct_episode_filters(
+    query,
+    *,
+    tenant_uuid: str | None,
+    status: str | None,
+    risk: str | None,
+    q: str | None,
+    registry_match_uuids: Sequence[uuid.UUID] | None,
+):
     if tenant_uuid:
         query = query.filter(CareEpisode.tenant_uuid == uuid.UUID(str(tenant_uuid)))
-    if status:
+    if status and status != "all":
         normalized = str(status).strip().lower()
         if normalized in {EPISODE_STATUS_ACTIVE, EPISODE_STATUS_CLOSED}:
             query = query.filter(CareEpisode.status == normalized)
-    rows = (
-        query.distinct(CareEpisode.patient_uuid)
+    risk_level = _risk_filter_value(risk)
+    if risk_level:
+        query = query.filter(CareEpisode.risk_level == risk_level)
+    search = str(q or "").strip().lower()
+    registry_ids = [uuid.UUID(str(value)) for value in (registry_match_uuids or [])]
+    if search or registry_ids:
+        predicates = []
+        if search:
+            like = f"%{search}%"
+            predicates.append(
+                (CareEpisode.surgery.ilike(like))
+                | (CareEpisode.recovery_id.ilike(like))
+                | (cast(CareEpisode.patient_uuid, String).ilike(like))
+            )
+        if registry_ids:
+            predicates.append(CareEpisode.patient_uuid.in_(registry_ids))
+        query = query.filter(or_(*predicates))
+    return query
+
+
+def _latest_episode_rows_query(
+    db,
+    *,
+    tenant_uuid: str | None = None,
+    status: str | None = None,
+    risk: str | None = None,
+    q: str | None = None,
+    registry_match_uuids: Sequence[uuid.UUID] | None = None,
+):
+    days_post_op = _days_post_op_expr()
+    query = db.query(CareEpisode, days_post_op)
+    query = _apply_pre_distinct_episode_filters(
+        query,
+        tenant_uuid=tenant_uuid,
+        status=status,
+        risk=risk,
+        q=q,
+        registry_match_uuids=registry_match_uuids,
+    )
+    return query.distinct(CareEpisode.patient_uuid).order_by(
+        CareEpisode.patient_uuid,
+        _episode_priority(),
+        CareEpisode.changed_at.desc(),
+        CareEpisode.procedure_date.desc(),
+        CareEpisode.surgery.asc(),
+    )
+
+
+def _apply_post_distinct_episode_filters(
+    query,
+    *,
+    min_days_post_op: int | None = None,
+    activity: str | None = None,
+    min_days_since_activity: int | None = None,
+    now: datetime.datetime | None = None,
+):
+    current = now or datetime.datetime.now(tz=UTC)
+    if min_days_post_op is not None and min_days_post_op > 0:
+        query = query.filter(_days_post_op_expr() >= min_days_post_op)
+    last_ts = _last_activity_ts_expr()
+    activity_cutoff = _activity_cutoff_datetime(activity, now=current)
+    if activity_cutoff is not None:
+        query = query.filter(last_ts.isnot(None), last_ts >= activity_cutoff)
+    if min_days_since_activity is not None and min_days_since_activity > 0:
+        inactive_cutoff = current - datetime.timedelta(days=min_days_since_activity)
+        query = query.filter(or_(last_ts.is_(None), last_ts <= inactive_cutoff))
+    return query
+
+
+def _filtered_episode_rows_subquery(
+    db,
+    *,
+    tenant_uuid: str | None = None,
+    status: str | None = None,
+    risk: str | None = None,
+    q: str | None = None,
+    registry_match_uuids: Sequence[uuid.UUID] | None = None,
+    min_days_post_op: int | None = None,
+    activity: str | None = None,
+    min_days_since_activity: int | None = None,
+    now: datetime.datetime | None = None,
+):
+    latest_rows = _latest_episode_rows_query(
+        db,
+        tenant_uuid=tenant_uuid,
+        status=status,
+        risk=risk,
+        q=q,
+        registry_match_uuids=registry_match_uuids,
+    )
+    latest_rows = _apply_post_distinct_episode_filters(
+        latest_rows,
+        min_days_post_op=min_days_post_op,
+        activity=activity,
+        min_days_since_activity=min_days_since_activity,
+        now=now,
+    )
+    return latest_rows.subquery("filtered_episode_rows")
+
+
+def _episode_dict_from_row(row, *, risk_summary: str = "") -> dict:
+    closed_at = None
+    if (row.status or EPISODE_STATUS_ACTIVE) == EPISODE_STATUS_CLOSED and row.changed_at is not None:
+        closed_at = row.changed_at.astimezone(UTC).isoformat()
+    return {
+        "episode_uuid": str(row.episode_uuid),
+        "patient_uuid": str(row.patient_uuid),
+        "surgery": row.surgery,
+        "procedure_date": row.procedure_date.isoformat(),
+        "recovery_id": row.recovery_id,
+        "risk_level": row.risk_level or "low",
+        "care_window_days": int(row.care_window_days or DEFAULT_CARE_WINDOW_DAYS),
+        "status": row.status or EPISODE_STATUS_ACTIVE,
+        "tenant_uuid": str(row.tenant_uuid),
+        "closed_at": closed_at,
+        "last_activity": row.last_activity,
+        "days_post_op": int(row.days_post_op),
+        "risk_summary": risk_summary,
+    }
+
+
+def list_episodes(
+    db,
+    tenant_uuid: str | None = None,
+    *,
+    status: str | None = None,
+    risk: str | None = None,
+    q: str | None = None,
+    registry_match_uuids: Sequence[uuid.UUID] | None = None,
+    min_days_post_op: int | None = None,
+    activity: str | None = None,
+    min_days_since_activity: int | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[dict], int]:
+    filtered_rows = _filtered_episode_rows_subquery(
+        db,
+        tenant_uuid=tenant_uuid,
+        status=status,
+        risk=risk,
+        q=q,
+        registry_match_uuids=registry_match_uuids,
+        min_days_post_op=min_days_post_op,
+        activity=activity,
+        min_days_since_activity=min_days_since_activity,
+    )
+    total = db.query(func.count()).select_from(filtered_rows).scalar() or 0
+    safe_page = max(1, page)
+    safe_page_size = max(1, page_size)
+    offset = (safe_page - 1) * safe_page_size
+    last_ts = _last_activity_ts_expr(filtered_rows.c.last_activity)
+    page_rows = (
+        db.query(filtered_rows)
         .order_by(
-            CareEpisode.patient_uuid,
-            _episode_priority(),
-            CareEpisode.changed_at.desc(),
-            CareEpisode.procedure_date.desc(),
-            CareEpisode.surgery.asc(),
+            _risk_rank_expr(filtered_rows.c.risk_level),
+            last_ts.desc().nullslast(),
+            filtered_rows.c.surgery.asc(),
         )
+        .offset(offset)
+        .limit(safe_page_size)
         .all()
     )
-    summaries = _latest_risk_summaries_by_patient(db, [episode.patient_uuid for episode, _ in rows])
-    return [
-        _episode_dict(
-            episode,
-            days_post_op=int(days),
-            risk_summary=summaries.get(episode.patient_uuid, ""),
-        )
-        for episode, days in rows
+    summaries = _latest_risk_summaries_by_patient(
+        db,
+        [row.patient_uuid for row in page_rows],
+    )
+    items = [
+        _episode_dict_from_row(row, risk_summary=summaries.get(row.patient_uuid, ""))
+        for row in page_rows
     ]
+    return items, int(total)
+
+
+def enrolled_patient_uuids(db, tenant_uuid: str) -> set[uuid.UUID]:
+    tenant_id = uuid.UUID(str(tenant_uuid))
+    rows = (
+        db.query(CareEpisode.patient_uuid)
+        .filter(CareEpisode.tenant_uuid == tenant_id)
+        .distinct()
+        .all()
+    )
+    return {row[0] for row in rows}
+
+
+def roster_filter_counts(
+    db,
+    tenant_uuid: str,
+    *,
+    status: str = "active",
+) -> dict[str, int]:
+    now = datetime.datetime.now(tz=UTC)
+    filtered_rows = _filtered_episode_rows_subquery(
+        db,
+        tenant_uuid=tenant_uuid,
+        status=status,
+        now=now,
+    )
+    last_ts = _last_activity_ts_expr(filtered_rows.c.last_activity)
+    chats_today_cutoff = _activity_cutoff_datetime("chats-today", now=now)
+    active_30m_cutoff = _activity_cutoff_datetime("active-30m", now=now)
+    row = (
+        db.query(
+            func.count(1).filter(filtered_rows.c.risk_level == "high"),
+            func.count(1).filter(filtered_rows.c.risk_level == "medium"),
+            func.count(1).filter(last_ts.isnot(None), last_ts >= chats_today_cutoff),
+            func.count(1).filter(last_ts.isnot(None), last_ts >= active_30m_cutoff),
+        )
+        .select_from(filtered_rows)
+        .one()
+    )
+    return {
+        "high_risk_count": int(row[0] or 0),
+        "medium_risk_count": int(row[1] or 0),
+        "chats_today_count": int(row[2] or 0),
+        "active_patients_30m_count": int(row[3] or 0),
+    }
 
 
 def patient_records(db, patient_uuid: str) -> list[dict]:

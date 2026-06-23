@@ -2,6 +2,19 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.12.0] - 2026-06-23
+
+### Added
+
+- **User registry integration** — roster search, profile enrichment, and enrollable-patient discovery resolve `patient.self` users from the User service at read time (requires **user v0.8.5** with **cdp-policies v0.3.1**).
+- **`GET /api/v1/care-episodes/roster-summary`** — clinician dashboard counts and preview rows.
+- **`GET /api/v1/care-episodes/enrollable-patients`** — tenant registry patients without an active care episode.
+
+### Changed
+
+- **`GET /api/v1/care-episodes`** — paginated roster with risk, activity, registry search (`q`), and post-op filters; responses include resolved **`patient`** profile and **`last_activity`**.
+- Episode list responses include **`total`**, **`page`**, and **`page_size`**.
+
 ## [0.11.0] - 2026-06-22
 
 ### Added

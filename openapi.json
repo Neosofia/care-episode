@@ -44,8 +44,86 @@
               "type": "string",
               "enum": [
                 "active",
-                "closed"
+                "closed",
+                "all"
               ]
+            }
+          },
+          {
+            "name": "risk",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "high-risk",
+                "medium-risk",
+                "high",
+                "medium",
+                "low"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "activity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "active-30m",
+                "chats-today",
+                "this-week"
+              ]
+            }
+          },
+          {
+            "name": "min_days_post_op",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "min_days_since_chat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
             }
           }
         ],
@@ -137,6 +215,123 @@
           },
           "503": {
             "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/care-episodes/roster-summary": {
+      "get": {
+        "operationId": "getCareEpisodeRosterSummary",
+        "summary": "Clinician dashboard counts and preview rows",
+        "parameters": [
+          {
+            "name": "tenant_uuid",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 4
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard roster summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RosterSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/care-episodes/enrollable-patients": {
+      "get": {
+        "operationId": "listEnrollablePatients",
+        "summary": "Tenant patient registry users without an active care episode",
+        "parameters": [
+          {
+            "name": "tenant_uuid",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enrollable registry patients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollablePatientsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream user registry unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1303,10 +1498,39 @@
             "readOnly": true,
             "description": "When status is closed, the audit-maintained changed_at timestamp from the close update. Omitted when active."
           },
+          "last_activity": {
+            "type": "string",
+            "description": "ISO-8601 timestamp of the latest patient or care-team activity on this episode."
+          },
           "care_window_days": {
             "type": "integer",
             "minimum": 1,
             "description": "Post-discharge monitoring window length in days from procedure date. Defaults to 30 when omitted on create."
+          },
+          "patient": {
+            "$ref": "#/components/schemas/PatientProfile",
+            "description": "Resolved at read time from the User registry."
+          }
+        }
+      },
+      "PatientProfile": {
+        "type": "object",
+        "properties": {
+          "display_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -1662,7 +1886,10 @@
       "EpisodeListResponse": {
         "type": "object",
         "required": [
-          "items"
+          "items",
+          "total",
+          "page",
+          "page_size"
         ],
         "properties": {
           "items": {
@@ -1670,6 +1897,73 @@
             "items": {
               "$ref": "#/components/schemas/CareEpisode"
             }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "RosterSummaryResponse": {
+        "type": "object",
+        "required": [
+          "high_risk_count",
+          "medium_risk_count",
+          "chats_today_count",
+          "active_patients_30m_count",
+          "preview",
+          "active_chats"
+        ],
+        "properties": {
+          "high_risk_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "medium_risk_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "chats_today_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active_patients_30m_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "preview": {
+            "$ref": "#/components/schemas/EpisodeListResponse"
+          },
+          "active_chats": {
+            "$ref": "#/components/schemas/EpisodeListResponse"
+          }
+        }
+      },
+      "EnrollablePatientsResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       },

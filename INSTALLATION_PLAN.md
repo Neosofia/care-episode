@@ -2,6 +2,31 @@
 
 Per-version deploy steps for operators. User-visible changes: [CHANGELOG.md](CHANGELOG.md).
 
+## care-episode v0.12.0 / user v0.8.5
+
+**Release pins:** **care-episode v0.12.0**; **user v0.8.5**; **cdp-policies v0.3.1**.
+
+**Prerequisites:**
+
+- Deploy **user v0.8.5** first so care-episode service tokens can list and read tenant registry rows.
+
+**Deploy:**
+
+1. Redeploy **user v0.8.5** (no new migration; head **`002`**).
+2. Redeploy **care-episode v0.12.0** (no new migration; head **`012`**).
+
+**Verify:**
+
+- `GET /health` on user → `"version": "0.8.5"`; on care-episode → `"version": "0.12.0"`.
+- Care-episode service token: `GET /api/v1/tenants/{tenant_uuid}/users` on user returns **200**.
+- Clinician roster loads with patient display names; registry search (`q`) filters the roster.
+- `GET /api/v1/care-episodes/enrollable-patients?tenant_uuid=…` returns registry patients without active episodes.
+- `GET /api/v1/care-episodes/roster-summary?tenant_uuid=…` returns dashboard counts and preview rows.
+
+**Evidence:** Health JSON from both services; roster with resolved patient names; enrollable-patients response sample.
+
+---
+
 ## care-episode v0.11.0
 
 **Image:** `ghcr.io/neosofia/care-episode:v0.11.0` (tag `care-episode/v0.11.0`)
