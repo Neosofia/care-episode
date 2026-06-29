@@ -71,10 +71,10 @@ class Settings(BaseSettings):
     authentication_token_timeout_seconds: float = Field(default=10.0, gt=0, le=10.0)
     service_registry_cache_ttl_seconds: int = Field(default=60, ge=0)
 
-    # Gunicorn — worker request silence limit; slightly above per-hop UI timeouts to avoid end-of-request races
+    # Gunicorn — worker request silence limit for the chat completion proxy (~10s upstream)
     web_concurrency: int = Field(default=1, ge=1)
     gunicorn_threads: int = Field(default=32, ge=1)
-    gunicorn_timeout: int = Field(default=15, ge=1)
+    gunicorn_timeout: int = Field(default=30, ge=1)
     
     # CORS settings
     frontend_url: str = Field(default="http://localhost:5173")

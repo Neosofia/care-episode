@@ -36,18 +36,20 @@ def test_submit_clinical_escalation_requires_registry_lookup(mock_resolve):
 
 @patch("src.clients.notification_client.settings")
 @patch("src.clients.notification_client.resolve_service_base_url", return_value="http://notification:8016")
-@patch("src.clients.notification_client.httpx.post")
-def test_submit_clinical_escalation_posts_deep_link_only(mock_post, _mock_resolve, mock_settings):
+@patch("src.clients.notification_client.get_http_client")
+def test_submit_clinical_escalation_posts_deep_link_only(mock_get_client, _mock_resolve, mock_settings):
     mock_settings.clinical_risk_alert_from_email = "care-episode-alerts@neosofia.tech"
     mock_settings.frontend_url = "https://staging.neosofia.tech"
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
     response = MagicMock()
     response.is_success = True
-    mock_post.return_value = response
+    mock_client.post.return_value = response
 
     _submit()
 
-    mock_post.assert_called_once()
-    call = mock_post.call_args
+    mock_client.post.assert_called_once()
+    call = mock_client.post.call_args
     assert call.args[0] == "http://notification:8016/api/emails"
     body = call.kwargs["json"]
     assert body["from_email"] == "care-episode-alerts@neosofia.tech"
@@ -62,24 +64,28 @@ def test_submit_clinical_escalation_posts_deep_link_only(mock_post, _mock_resolv
 
 
 @patch("src.clients.notification_client.resolve_service_base_url", return_value="http://notification:8016")
-@patch("src.clients.notification_client.httpx.post")
-def test_submit_clinical_escalation_upstream_502(mock_post, _mock_resolve):
+@patch("src.clients.notification_client.get_http_client")
+def test_submit_clinical_escalation_upstream_502(mock_get_client, _mock_resolve):
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
     response = MagicMock()
     response.is_success = False
     response.status_code = 502
     response.reason_phrase = "Bad Gateway"
     response.text = ""
     response.json.side_effect = ValueError("not json")
-    mock_post.return_value = response
+    mock_client.post.return_value = response
 
     with pytest.raises(BadGateway, match="temporarily unavailable"):
         _submit()
 
 
 @patch("src.clients.notification_client.resolve_service_base_url", return_value="http://notification:8016")
-@patch("src.clients.notification_client.httpx.post")
-def test_submit_clinical_escalation_network_error(mock_post, _mock_resolve):
-    mock_post.side_effect = httpx.ConnectError("connection refused")
+@patch("src.clients.notification_client.get_http_client")
+def test_submit_clinical_escalation_network_error(mock_get_client, _mock_resolve):
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_client.post.side_effect = httpx.ConnectError("connection refused")
 
     with pytest.raises(BadGateway, match="temporarily unavailable"):
         _submit()

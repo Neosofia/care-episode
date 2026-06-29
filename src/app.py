@@ -57,6 +57,16 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
 
     @app.errorhandler(HTTPException)
     def handle_http_exception(exc: HTTPException):
+        if exc.code == 502:
+            return (
+                jsonify(
+                    {
+                        "error": "upstream_error",
+                        "message": exc.description or "upstream service is temporarily unavailable",
+                    }
+                ),
+                502,
+            )
         return jsonify({"error": _http_error_name(exc.code or 500)}), exc.code or 500
 
     @app.errorhandler(Exception)

@@ -79,9 +79,11 @@ def _episode_dict(
         "care_window_days": int(episode.care_window_days or DEFAULT_CARE_WINDOW_DAYS),
         "status": episode.status or EPISODE_STATUS_ACTIVE,
         "tenant_uuid": str(episode.tenant_uuid),
-        "closed_at": _closed_at_iso(episode),
         "last_activity": episode.last_activity,
     }
+    closed_at = _closed_at_iso(episode)
+    if closed_at is not None:
+        payload["closed_at"] = closed_at
     if days_post_op is not None:
         payload["days_post_op"] = int(days_post_op)
         payload["risk_summary"] = risk_summary
@@ -337,7 +339,7 @@ def _episode_dict_from_row(row, *, risk_summary: str = "") -> dict:
     closed_at = None
     if (row.status or EPISODE_STATUS_ACTIVE) == EPISODE_STATUS_CLOSED and row.changed_at is not None:
         closed_at = row.changed_at.astimezone(UTC).isoformat()
-    return {
+    payload = {
         "episode_uuid": str(row.episode_uuid),
         "patient_uuid": str(row.patient_uuid),
         "surgery": row.surgery,
@@ -347,11 +349,13 @@ def _episode_dict_from_row(row, *, risk_summary: str = "") -> dict:
         "care_window_days": int(row.care_window_days or DEFAULT_CARE_WINDOW_DAYS),
         "status": row.status or EPISODE_STATUS_ACTIVE,
         "tenant_uuid": str(row.tenant_uuid),
-        "closed_at": closed_at,
         "last_activity": row.last_activity,
         "days_post_op": int(row.days_post_op),
         "risk_summary": risk_summary,
     }
+    if closed_at is not None:
+        payload["closed_at"] = closed_at
+    return payload
 
 
 def list_episodes(
@@ -417,22 +421,16 @@ def enrolled_patient_uuids(db, tenant_uuid: str) -> set[uuid.UUID]:
     return {row[0] for row in rows}
 
 
-def roster_filter_counts(
+def _roster_counts_from_filtered_rows(
     db,
-    tenant_uuid: str,
+    filtered_rows,
     *,
-    status: str = "active",
+    now: datetime.datetime | None = None,
 ) -> dict[str, int]:
-    now = datetime.datetime.now(tz=UTC)
-    filtered_rows = _filtered_episode_rows_subquery(
-        db,
-        tenant_uuid=tenant_uuid,
-        status=status,
-        now=now,
-    )
+    current = now or datetime.datetime.now(tz=UTC)
     last_ts = _last_activity_ts_expr(filtered_rows.c.last_activity)
-    chats_today_cutoff = _activity_cutoff_datetime("chats-today", now=now)
-    active_30m_cutoff = _activity_cutoff_datetime("active-30m", now=now)
+    chats_today_cutoff = _activity_cutoff_datetime("chats-today", now=current)
+    active_30m_cutoff = _activity_cutoff_datetime("active-30m", now=current)
     row = (
         db.query(
             func.count(1).filter(filtered_rows.c.risk_level == "high"),
@@ -448,6 +446,134 @@ def roster_filter_counts(
         "medium_risk_count": int(row[1] or 0),
         "chats_today_count": int(row[2] or 0),
         "active_patients_30m_count": int(row[3] or 0),
+    }
+
+
+def _scoped_filtered_episode_query(
+    db,
+    filtered_rows,
+    *,
+    activity: str | None = None,
+    now: datetime.datetime | None = None,
+):
+    query = db.query(filtered_rows)
+    activity_cutoff = _activity_cutoff_datetime(activity, now=now)
+    if activity_cutoff is None:
+        return query
+    last_ts = _last_activity_ts_expr(filtered_rows.c.last_activity)
+    return query.filter(last_ts.isnot(None), last_ts >= activity_cutoff)
+
+
+def _paginate_filtered_episode_rows(
+    db,
+    filtered_rows,
+    *,
+    page: int,
+    page_size: int,
+    activity: str | None = None,
+    now: datetime.datetime | None = None,
+) -> tuple[list, int]:
+    scoped = _scoped_filtered_episode_query(
+        db,
+        filtered_rows,
+        activity=activity,
+        now=now,
+    )
+    total = db.query(func.count()).select_from(scoped.subquery()).scalar() or 0
+    safe_page = max(1, page)
+    safe_page_size = max(1, page_size)
+    offset = (safe_page - 1) * safe_page_size
+    last_ts = _last_activity_ts_expr(filtered_rows.c.last_activity)
+    page_rows = (
+        scoped.order_by(
+            _risk_rank_expr(filtered_rows.c.risk_level),
+            last_ts.desc().nullslast(),
+            filtered_rows.c.surgery.asc(),
+        )
+        .offset(offset)
+        .limit(safe_page_size)
+        .all()
+    )
+    return page_rows, int(total)
+
+
+def roster_filter_counts(
+    db,
+    tenant_uuid: str,
+    *,
+    status: str = "active",
+) -> dict[str, int]:
+    now = datetime.datetime.now(tz=UTC)
+    filtered_rows = _filtered_episode_rows_subquery(
+        db,
+        tenant_uuid=tenant_uuid,
+        status=status,
+        now=now,
+    )
+    return _roster_counts_from_filtered_rows(db, filtered_rows, now=now)
+
+
+def roster_summary(
+    db,
+    tenant_uuid: str,
+    *,
+    preview_page: int = 1,
+    preview_page_size: int = 20,
+    active_chat_page_size: int = 10,
+) -> dict[str, Any]:
+    """Dashboard roster: counts, preview page, and active-chat slice from one DISTINCT-ON pass."""
+    now = datetime.datetime.now(tz=UTC)
+    filtered_rows = _filtered_episode_rows_subquery(
+        db,
+        tenant_uuid=tenant_uuid,
+        status=EPISODE_STATUS_ACTIVE,
+        now=now,
+    )
+    counts = _roster_counts_from_filtered_rows(db, filtered_rows, now=now)
+    preview_rows, preview_total = _paginate_filtered_episode_rows(
+        db,
+        filtered_rows,
+        page=preview_page,
+        page_size=preview_page_size,
+        now=now,
+    )
+    active_rows, active_total = _paginate_filtered_episode_rows(
+        db,
+        filtered_rows,
+        page=1,
+        page_size=active_chat_page_size,
+        activity="active-30m",
+        now=now,
+    )
+    patient_uuids = list(
+        {row.patient_uuid for row in preview_rows} | {row.patient_uuid for row in active_rows}
+    )
+    summaries = _latest_risk_summaries_by_patient(db, patient_uuids)
+    preview_items = [
+        _episode_dict_from_row(row, risk_summary=summaries.get(row.patient_uuid, ""))
+        for row in preview_rows
+    ]
+    active_items = [
+        _episode_dict_from_row(row, risk_summary=summaries.get(row.patient_uuid, ""))
+        for row in active_rows
+    ]
+    safe_preview_page = max(1, preview_page)
+    safe_preview_page_size = max(1, preview_page_size)
+    safe_active_page_size = max(1, active_chat_page_size)
+    return {
+        **counts,
+        "preview": {
+            "items": preview_items,
+            "total": preview_total,
+            "page": safe_preview_page,
+            "page_size": safe_preview_page_size,
+        },
+        "active_chats": {
+            "items": active_items,
+            "total": active_total,
+            "page": 1,
+            "page_size": safe_active_page_size,
+        },
     }
 
 

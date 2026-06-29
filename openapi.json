@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Care Episode Service API",
-    "version": "0.11.0",
+    "version": "0.12.1",
     "description": "Care episodes, demo recoveries, records, appointments, inbox messages, and patient chat proxy."
   },
   "paths": {
@@ -158,6 +158,16 @@
               }
             }
           },
+          "502": {
+            "description": "Upstream user registry unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Error",
             "content": {
@@ -275,6 +285,16 @@
           },
           "400": {
             "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream user registry unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1375,9 +1395,13 @@
               "method_not_allowed",
               "payload_too_large",
               "http_error",
+              "upstream_error",
               "authorization_unavailable",
               "internal_server_error"
             ]
+          },
+          "message": {
+            "type": "string"
           }
         }
       },

@@ -35,8 +35,10 @@ def test_parse_model_payload_rejects_invalid_level():
         RiskAgent._parse_model_payload(json.dumps({"risk_level": "critical", "summary": "x"}))
 
 
-@patch("src.services.risk_agent_service.httpx.post")
-def test_evaluate_returns_parsed_result(mock_post):
+@patch("src.services.risk_agent_service.get_http_client")
+def test_evaluate_returns_parsed_result(mock_get_client):
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
     mock_response = MagicMock()
     mock_response.raise_for_status.return_value = None
     mock_response.json.return_value = {
@@ -53,7 +55,7 @@ def test_evaluate_returns_parsed_result(mock_post):
             },
         ],
     }
-    mock_post.return_value = mock_response
+    mock_client.post.return_value = mock_response
 
     with patch("src.services.risk_agent_service.risk_inference_configured", return_value=True):
         result = RiskAgent.evaluate(
@@ -66,8 +68,11 @@ def test_evaluate_returns_parsed_result(mock_post):
     assert "swelling" in result.summary
 
 
-@patch("src.services.risk_agent_service.httpx.post", side_effect=httpx.HTTPError("down"))
-def test_evaluate_maps_http_errors(mock_post):
+@patch("src.services.risk_agent_service.get_http_client")
+def test_evaluate_maps_http_errors(mock_get_client):
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_client.post.side_effect = httpx.HTTPError("down")
     with (
         patch("src.services.risk_agent_service.risk_inference_configured", return_value=True),
         pytest.raises(ServiceUnavailable, match="temporarily unavailable"),

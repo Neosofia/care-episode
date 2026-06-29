@@ -5,6 +5,7 @@ from platform_client import UpstreamError, UpstreamUnavailable, raise_for_upstre
 from werkzeug.exceptions import BadGateway
 
 from src.bootstrap.config import settings
+from src.clients.http_client import get_http_client
 from src.clients.mesh_client import resolve_service_base_url
 
 NOTIFICATION_SERVICE_SLUG = "notification"
@@ -41,7 +42,7 @@ def submit_clinical_escalation(
     }
 
     try:
-        response = httpx.post(
+        response = get_http_client().post(
             f"{base}/api/emails",
             headers={"Content-Type": "application/json"},
             json=payload,

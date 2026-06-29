@@ -79,6 +79,8 @@ Structured telemetry on chat proxy routes uses `chat_interaction_create` and `ch
 | Demo session model | Accepted (v1) | `patient_uuid` doubles as episode key; full FR-004 lifecycle deferred |
 | Rate limit storage in-memory | Accepted (baseline) | Set `RATE_LIMIT_STORAGE_URI` to Redis when running multiple replicas |
 | Mesh clients in-repo | Accepted (v1) | `src/clients/*` local until SDK extraction |
+| Clinical risk notification | Accepted (best-effort) | High-risk chat escalation emails run **after** the chat completion response, on a background worker thread. Notification failures are logged (`risk_escalation`, outcome `notification_downstream`) and do not affect the patient chat **200**. |
+| User registry scan cap | Accepted (v1) | CE scans at most **10 × 100** tenant user rows per registry call; exceeding the cap returns **502** `upstream_error` rather than a silently truncated roster. |
 
 ---
 

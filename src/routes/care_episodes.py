@@ -40,7 +40,7 @@ from src.services.care_episode_service import (
     replace_appointments,
     replace_inbox_messages,
     replace_records,
-    roster_filter_counts,
+    roster_summary,
     start_new_episode,
     upsert_episode,
 )
@@ -173,10 +173,7 @@ def _registry_search(tenant_uuid: str | None, search: str | None) -> tuple[list,
     trimmed_search = str(search or "").strip()
     if not trimmed_tenant or not trimmed_search:
         return [], {}
-    try:
-        users = user_client.list_tenant_patient_users(trimmed_tenant, search=trimmed_search)
-    except BadGateway:
-        return [], {}
+    users = user_client.list_tenant_patient_users(trimmed_tenant, search=trimmed_search)
     registry_uuids: list = []
     profiles: dict[str, dict] = {}
     for user in users:
@@ -199,10 +196,7 @@ def _attach_patient_profiles(
     missing = [user_uuid for user_uuid in patient_uuids if user_uuid not in profiles]
     tenant_uuid = str(items[0].get("tenant_uuid") or "").strip()
     if missing and tenant_uuid:
-        try:
-            profiles.update(user_client.get_patient_profiles_for_tenant(tenant_uuid, missing))
-        except BadGateway:
-            pass
+        profiles.update(user_client.get_patient_profiles_for_tenant(tenant_uuid, missing))
     for item in items:
         profile = profiles.get(str(item["patient_uuid"]))
         if profile:
@@ -276,41 +270,17 @@ def get_roster_summary() -> Response:
         return error
     preview_page, preview_page_size = pagination
     with SessionLocal() as db:
-        counts = roster_filter_counts(db, tenant_uuid)
-        preview_items, preview_total = list_episodes(
+        summary = roster_summary(
             db,
-            tenant_uuid=tenant_uuid,
-            status="active",
-            page=preview_page,
-            page_size=preview_page_size,
+            tenant_uuid,
+            preview_page=preview_page,
+            preview_page_size=preview_page_size,
+            active_chat_page_size=10,
         )
-        active_chat_items, active_chat_total = list_episodes(
-            db,
-            tenant_uuid=tenant_uuid,
-            status="active",
-            activity="active-30m",
-            page=1,
-            page_size=10,
+        _attach_patient_profiles(
+            summary["preview"]["items"] + summary["active_chats"]["items"],
         )
-        _attach_patient_profiles(preview_items)
-        _attach_patient_profiles(active_chat_items)
-        return jsonify(
-            {
-                **counts,
-                "preview": {
-                    "items": preview_items,
-                    "total": preview_total,
-                    "page": preview_page,
-                    "page_size": preview_page_size,
-                },
-                "active_chats": {
-                    "items": active_chat_items,
-                    "total": active_chat_total,
-                    "page": 1,
-                    "page_size": 10,
-                },
-            }
-        )
+        return jsonify(summary)
 
 
 @bp.get("/enrollable-patients")
@@ -323,10 +293,7 @@ def get_enrollable_patients() -> Response:
     if not tenant_uuid:
         return jsonify({"error": "invalid_request", "message": "tenant_uuid is required"}), 400
     search = str(request.args.get("q") or "").strip()
-    try:
-        registry_users = user_client.list_tenant_patient_users(tenant_uuid, search=search or None)
-    except BadGateway as exc:
-        return jsonify({"error": "upstream_error", "message": str(exc.description)}), 502
+    registry_users = user_client.list_tenant_patient_users(tenant_uuid, search=search or None)
     with SessionLocal() as db:
         enrolled = enrolled_patient_uuids(db, tenant_uuid)
     items = [

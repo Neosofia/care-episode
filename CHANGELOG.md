@@ -2,6 +2,18 @@
 
 What changed for care-episode consumers. Deploy: [INSTALLATION_PLAN.md](INSTALLATION_PLAN.md).
 
+## [0.12.1] - 2026-06-29
+
+### Changed
+
+- **User registry unavailable** — roster list, roster summary, registry search (`q`), and enrollable-patient discovery return **502** with `upstream_error` when the User service cannot be reached; responses no longer omit patient names or search matches while returning **200**.
+- **`GET /api/v1/care-episodes/roster-summary`** — dashboard counts and preview slices share one latest-episode query pass for lower database load.
+- **Patient chat completion proxy** — returns the Chat reply as soon as Chat responds; clinical risk scoring and escalation email run **asynchronously** on a background worker thread (completion payloads no longer include inline **`risk_evaluation`**). Default **Gunicorn** request timeout increased to **30s** for the Chat upstream hop only.
+
+### Fixed
+
+- **`openapi.json`** `info.version` aligned with the shipped service semver (**0.12.1**).
+
 ## [0.12.0] - 2026-06-23
 
 ### Added

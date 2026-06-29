@@ -8,6 +8,7 @@ import httpx
 from werkzeug.exceptions import ServiceUnavailable
 
 from src.bootstrap.config import settings
+from src.clients.http_client import get_http_client
 from src.services.inference_health import risk_inference_configured
 
 # Soft cap: SYSTEM_PROMPT asks the model for summary max 400 words; tokens are the hard API limit.
@@ -118,7 +119,7 @@ Rules:
         }
 
         try:
-            response = httpx.post(
+            response = get_http_client().post(
                 settings.inference_completions_url,
                 headers={
                     "Authorization": f"Bearer {settings.inference_api_key}",

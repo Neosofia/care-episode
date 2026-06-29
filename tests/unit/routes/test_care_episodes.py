@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import jwt
 import pytest
+from werkzeug.exceptions import BadGateway
 
 pytestmark = pytest.mark.unit
 
@@ -334,3 +335,166 @@ def test_get_patient_audits_route_requires_source(mock_current, client, rsa_keyp
         base_url="https://localhost",
     )
     assert response.status_code == 400
+
+
+@patch("src.routes.care_episodes.user_client.get_patient_profiles_for_tenant", return_value={})
+@patch("src.routes.care_episodes.roster_summary")
+@patch("src.routes.care_episodes.SessionLocal")
+def test_get_roster_summary(mock_session, mock_roster_summary, _mock_profiles, client, rsa_keypair):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    mock_roster_summary.return_value = {
+        "high_risk_count": 2,
+        "medium_risk_count": 1,
+        "chats_today_count": 4,
+        "active_patients_30m_count": 1,
+        "preview": {
+            "items": [{"patient_uuid": PATIENT, "tenant_uuid": TENANT, "surgery": "Knee"}],
+            "total": 3,
+            "page": 1,
+            "page_size": 8,
+        },
+        "active_chats": {
+            "items": [],
+            "total": 0,
+            "page": 1,
+            "page_size": 10,
+        },
+    }
+    response = client.get(
+        f"/api/v1/care-episodes/roster-summary?tenant_uuid={TENANT}&page=1&page_size=8",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["high_risk_count"] == 2
+    assert body["preview"]["total"] == 3
+    mock_roster_summary.assert_called_once()
+
+
+def test_get_roster_summary_requires_tenant_uuid(client, rsa_keypair):
+    response = client.get(
+        "/api/v1/care-episodes/roster-summary",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 403
+
+
+def test_get_roster_summary_rejects_invalid_pagination(client, rsa_keypair):
+    response = client.get(
+        f"/api/v1/care-episodes/roster-summary?tenant_uuid={TENANT}&page=not-a-number",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["error"] == "invalid pagination"
+
+
+@patch("src.routes.care_episodes.user_client.list_tenant_patient_users")
+@patch("src.routes.care_episodes.list_episodes", return_value=([], 0))
+@patch("src.routes.care_episodes.SessionLocal")
+def test_get_care_episodes_returns_502_when_registry_search_fails(
+    mock_session,
+    _mock_list_episodes,
+    mock_list_users,
+    client,
+    rsa_keypair,
+):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    mock_list_users.side_effect = BadGateway("user service is temporarily unavailable")
+    response = client.get(
+        f"/api/v1/care-episodes?tenant_uuid={TENANT}&q=demo",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 502
+    body = response.get_json()
+    assert body["error"] == "upstream_error"
+    assert "user service" in body["message"]
+
+
+@patch("src.routes.care_episodes.user_client.get_patient_profiles_for_tenant")
+@patch(
+    "src.routes.care_episodes.list_episodes",
+    return_value=([{"patient_uuid": PATIENT, "tenant_uuid": TENANT}], 1),
+)
+@patch("src.routes.care_episodes.SessionLocal")
+def test_get_care_episodes_returns_502_when_profile_lookup_fails(
+    mock_session,
+    _mock_list_episodes,
+    mock_profiles,
+    client,
+    rsa_keypair,
+):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    mock_profiles.side_effect = BadGateway("user service is temporarily unavailable")
+    response = client.get(
+        f"/api/v1/care-episodes?tenant_uuid={TENANT}",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 502
+    body = response.get_json()
+    assert body["error"] == "upstream_error"
+
+
+@patch("src.routes.care_episodes.user_client.get_patient_profiles_for_tenant")
+@patch("src.routes.care_episodes.roster_summary")
+@patch("src.routes.care_episodes.SessionLocal")
+def test_get_roster_summary_returns_502_when_profile_lookup_fails(
+    mock_session,
+    mock_roster_summary,
+    mock_profiles,
+    client,
+    rsa_keypair,
+):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    mock_roster_summary.return_value = {
+        "high_risk_count": 0,
+        "medium_risk_count": 0,
+        "chats_today_count": 0,
+        "active_patients_30m_count": 0,
+        "preview": {
+            "items": [{"patient_uuid": PATIENT, "tenant_uuid": TENANT}],
+            "total": 1,
+            "page": 1,
+            "page_size": 8,
+        },
+        "active_chats": {
+            "items": [],
+            "total": 0,
+            "page": 1,
+            "page_size": 10,
+        },
+    }
+    mock_profiles.side_effect = BadGateway("user service is temporarily unavailable")
+    response = client.get(
+        f"/api/v1/care-episodes/roster-summary?tenant_uuid={TENANT}",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 502
+    assert response.get_json()["error"] == "upstream_error"
+
+
+@patch("src.routes.care_episodes.user_client.list_tenant_patient_users")
+@patch("src.routes.care_episodes.SessionLocal")
+def test_get_enrollable_patients_returns_502_when_user_registry_unavailable(
+    mock_session,
+    mock_list_users,
+    client,
+    rsa_keypair,
+):
+    mock_session.return_value.__enter__.return_value = MagicMock()
+    mock_list_users.side_effect = BadGateway("user service is temporarily unavailable")
+    response = client.get(
+        f"/api/v1/care-episodes/enrollable-patients?tenant_uuid={TENANT}",
+        headers=_auth_headers(rsa_keypair, actors=["clinician"]),
+        base_url="https://localhost",
+    )
+    assert response.status_code == 502
+    body = response.get_json()
+    assert body["error"] == "upstream_error"
+    assert "user service" in body["message"]

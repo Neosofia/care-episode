@@ -83,9 +83,9 @@ def test_create_chat_interaction_prefers_jwt_tenant(mock_create, mock_active):
 
 
 @patch("src.services.chat_proxy_service.get_active_episode")
-@patch("src.services.chat_proxy_service.update_risk_after_patient_chat_message")
+@patch("src.services.chat_proxy_service.schedule_risk_evaluation_after_chat")
 @patch("src.services.chat_proxy_service.chat_client.create_completion")
-def test_proxy_chat_completion_updates_last_activity(mock_create, mock_evaluate, mock_active):
+def test_proxy_chat_completion_updates_last_activity(mock_create, mock_schedule, mock_active):
     db = MagicMock()
     episode = _episode_row()
     mock_active.return_value = episode
@@ -93,7 +93,6 @@ def test_proxy_chat_completion_updates_last_activity(mock_create, mock_evaluate,
         "message": "hello",
         "user_message": {"message_uuid": "00000000-0000-7000-8000-000000000099"},
     }
-    mock_evaluate.return_value = {"risk_level": "low", "escalated": False}
     app = Flask(__name__)
     with app.test_request_context("/"):
         g.jwt_claims = {
@@ -107,17 +106,17 @@ def test_proxy_chat_completion_updates_last_activity(mock_create, mock_evaluate,
             {"content": "Hi", "patient_display_name": "Alex Patient"},
         )
     assert result["message"] == "hello"
-    assert result["risk_evaluation"]["risk_level"] == "low"
-    mock_evaluate.assert_called_once()
-    assert mock_evaluate.call_args.kwargs["patient_display_name"] == "Alex Patient"
+    assert "risk_evaluation" not in result
+    mock_schedule.assert_called_once()
+    assert mock_schedule.call_args.kwargs["patient_display_name"] == "Alex Patient"
     assert episode.last_activity
     db.commit.assert_called_once()
 
 
 @patch("src.services.chat_proxy_service.get_active_episode")
-@patch("src.services.chat_proxy_service.update_risk_after_patient_chat_message")
+@patch("src.services.chat_proxy_service.schedule_risk_evaluation_after_chat")
 @patch("src.services.chat_proxy_service.chat_client.create_completion")
-def test_proxy_chat_completion_skips_risk_on_session_start(mock_create, mock_evaluate, mock_active):
+def test_proxy_chat_completion_skips_risk_on_session_start(mock_create, mock_schedule, mock_active):
     db = MagicMock()
     mock_active.return_value = _episode_row()
     mock_create.return_value = {"message": "Welcome", "assistant_message": {"message_uuid": "a1"}}
@@ -134,4 +133,4 @@ def test_proxy_chat_completion_skips_risk_on_session_start(mock_create, mock_eva
             {"session_start": True},
         )
     assert "risk_evaluation" not in result
-    mock_evaluate.assert_not_called()
+    mock_schedule.assert_not_called()

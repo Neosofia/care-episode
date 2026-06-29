@@ -2,6 +2,25 @@
 
 Per-version deploy steps for operators. User-visible changes: [CHANGELOG.md](CHANGELOG.md).
 
+## care-episode v0.12.1
+
+**Release pins:** **care-episode v0.12.1** (requires **user v0.8.5** unchanged).
+
+**Deploy:**
+
+1. Redeploy **care-episode v0.12.1** (migration head **`013`** — roster query indexes).
+
+**Verify:**
+
+- `GET /health` on care-episode → `"version": "0.12.1"`.
+- Clinician roster, roster summary, and enrollable patients still load with patient display names when user is healthy.
+- With user unavailable, `GET /api/v1/care-episodes?tenant_uuid=…`, `GET /api/v1/care-episodes/roster-summary?tenant_uuid=…`, and `GET /api/v1/care-episodes/enrollable-patients?tenant_uuid=…` return **502** with `{ "error": "upstream_error", … }` (not **200** with partial rows).
+- Patient chat content completion → **200** with Chat reply only (no inline `risk_evaluation`); episode `risk_level` and interaction summaries update within seconds when inference is configured.
+
+**Evidence:** Health JSON; roster **200** sample with `patient` enrichment; documented **502** from one registry-dependent endpoint when user is stopped; chat completion **200** without waiting for inference.
+
+---
+
 ## care-episode v0.12.0 / user v0.8.5
 
 **Release pins:** **care-episode v0.12.0**; **user v0.8.5**; **cdp-policies v0.3.1**.

@@ -14,6 +14,7 @@ def test_openapi_spec_contains_core_paths():
     assert spec["info"]["title"] == "Care Episode Service API"
     assert "/health" in spec["paths"]
     assert "/api/v1/care-episodes" in spec["paths"]
+    assert "/api/v1/care-episodes/roster-summary" in spec["paths"]
     assert "/api/v1/care-episodes/procedures" in spec["paths"]
     assert "/api/v1/care-episodes/{patient_uuid}/chat/interactions" in spec["paths"]
     assert (
@@ -34,7 +35,7 @@ def test_openapi_spec_contains_core_paths():
         "ChatMessageSummary",
     ):
         assert schema not in spec["components"]["schemas"]
-    assert spec["info"]["version"] == "0.11.0"
+    assert spec["info"]["version"] == "0.12.1"
 
 
 def test_openapi_operation_ids_are_unique():

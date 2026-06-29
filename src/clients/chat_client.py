@@ -13,6 +13,7 @@ from platform_client import (
 from werkzeug.exceptions import BadGateway, ServiceUnavailable
 
 from src.bootstrap.config import settings
+from src.clients.http_client import get_http_client
 from src.clients.mesh_client import resolve_service_base_url, token_broker
 
 CHAT_SERVICE = "chat"
@@ -31,7 +32,7 @@ def create_interaction(user_uuid: str, *, context: dict | None) -> dict[str, Any
         except (RuntimeError, ValueError) as exc:
             raise ServiceUnavailable("failed to obtain service token") from exc
 
-        response = httpx.post(
+        response = get_http_client().post(
             f"{base}/api/v1/users/{user_uuid}/interactions",
             headers={
                 "Content-Type": "application/json",
@@ -71,7 +72,7 @@ def create_completion(
         if "Authorization" not in headers:
             raise BadGateway("chat completion requires caller authorization")
 
-        response = httpx.post(
+        response = get_http_client().post(
             f"{base}/api/v1/users/{user_uuid}/interactions/{chat_interaction_uuid}/completions",
             headers={"Content-Type": "application/json", **headers},
             json=payload,

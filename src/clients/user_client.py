@@ -12,6 +12,8 @@ from platform_client import (
 from werkzeug.exceptions import BadGateway, ServiceUnavailable
 
 from src.bootstrap.config import settings
+from src.bootstrap.logging_config import log_event
+from src.clients.http_client import get_http_client
 from src.clients.mesh_client import resolve_service_base_url, token_broker
 
 USER_SERVICE = "user"
@@ -19,6 +21,7 @@ PATIENT_SELF_ROLE = "patient.self"
 _UNAVAILABLE = "user service is temporarily unavailable"
 _MAX_SEARCH_PAGES = 10
 _SEARCH_PAGE_SIZE = 100
+_REGISTRY_SCAN_ROW_LIMIT = _MAX_SEARCH_PAGES * _SEARCH_PAGE_SIZE
 
 
 def _service_token() -> str:
@@ -39,9 +42,23 @@ def _user_base_url() -> str:
         raise ServiceUnavailable("failed to resolve user service base url") from exc
 
 
+def _raise_if_registry_scan_truncated(*, page: int, total_pages: int, context: str) -> None:
+    if page <= total_pages and page > _MAX_SEARCH_PAGES:
+        log_event(
+            "user_registry.scan_truncated",
+            context=context,
+            page_limit=_MAX_SEARCH_PAGES,
+            row_limit=_REGISTRY_SCAN_ROW_LIMIT,
+            total_pages=total_pages,
+        )
+        raise BadGateway(
+            f"user registry scan exceeded {_REGISTRY_SCAN_ROW_LIMIT} rows ({context})"
+        )
+
+
 def _request_json(method: str, url: str, *, params: dict | None = None) -> dict[str, Any]:
     try:
-        response = httpx.request(
+        response = get_http_client().request(
             method,
             url,
             headers={
@@ -115,6 +132,11 @@ def list_tenant_patient_users(
         total = int(body.get("total") or 0)
         total_pages = max(1, (total + _SEARCH_PAGE_SIZE - 1) // _SEARCH_PAGE_SIZE)
         page += 1
+    _raise_if_registry_scan_truncated(
+        page=page,
+        total_pages=total_pages,
+        context="tenant patient list",
+    )
     return users
 
 
@@ -167,4 +189,12 @@ def get_patient_profiles_for_tenant(
         total = int(body.get("total") or 0)
         total_pages = max(1, (total + _SEARCH_PAGE_SIZE - 1) // _SEARCH_PAGE_SIZE)
         page += 1
+
+    missing = needed - profiles.keys()
+    if missing:
+        _raise_if_registry_scan_truncated(
+            page=page,
+            total_pages=total_pages,
+            context="patient profile lookup",
+        )
     return profiles
